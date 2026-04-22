@@ -1,0 +1,12 @@
+# openclaw-resume 项目自身排除
+.env
+*.key
+*.pem
+__pycache__/
+node_modules/
+.venv/
+*.pyc
+*.pyo
+*.egg-info/
+.DS_Store
+Thumbs.db
