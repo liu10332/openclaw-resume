@@ -13,6 +13,8 @@ OPENCLAW_RESUME_WORKSPACE="${OPENCLAW_RESUME_WORKSPACE:-$HOME/workspace}"
 
 # 禁止 git 交互式提示（避免卡住）
 export GIT_TERMINAL_PROMPT=0
+# 增大 HTTP 缓冲（避免大 push 超时）
+git config --global http.postBuffer 524288000 2>/dev/null || true
 
 # 颜色输出
 RED='\033[0;31m'
