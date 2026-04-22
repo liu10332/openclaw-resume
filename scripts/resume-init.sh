@@ -4,6 +4,7 @@
 # ========================================
 
 source "$(dirname "$0")/core.sh"
+source "$(dirname "$0")/env-capture.sh"
 
 resume-init() {
     local project_name="${1:-}"
@@ -49,12 +50,9 @@ resume-init() {
     if ! git clone "$clone_url" "$state_dir" 2>/dev/null; then
         # 如果仓库为空，初始化本地再推送
         mkdir -p "$state_dir"
-        cd "$state_dir"
-        git init
-        git remote add origin "$clone_url"
+        git -C "$state_dir" init
+        git -C "$state_dir" remote add origin "$clone_url"
     fi
-
-    cd "$state_dir"
 
     # 5. 创建目录结构
     log_step "创建目录结构..."
@@ -99,19 +97,18 @@ EOF
 
     # 7. 捕获环境
     log_step "捕获环境依赖..."
-    # 传入绝对路径，让脚本自己处理
-    bash "$(dirname "$0")/env-capture.sh" "$state_dir"
+    # 传入 state_dir 直接捕获，避免依赖项目检测
+    capture_environment "$state_dir"
 
     # 8. 提交并推送
     log_step "提交并推送..."
-    cd "$state_dir"
-    git add -A
-    git commit -m "init: ${project_name} state initialized"
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "init: ${project_name} state initialized"
     
     # 强制设置主分支为 main 并推送
-    git branch -M main
-    if git remote | grep -q "origin"; then
-        git push -u origin main
+    git -C "$state_dir" branch -M main
+    if git -C "$state_dir" remote | grep -q "origin"; then
+        git -C "$state_dir" push -u origin main
     else
         log_warn "未找到远程仓库 origin，请手动关联并推送"
         log_info "git remote add origin https://github.com/${OPENCLAW_RESUME_USER}/${repo_name}.git"

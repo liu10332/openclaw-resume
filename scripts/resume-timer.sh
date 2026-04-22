@@ -67,12 +67,10 @@ start_timer() {
             # 执行同步
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] 执行自动同步..." >> "$LOG_FILE"
 
-            cd "$state_dir" || continue
-
             # 更新 last_saved
             local now
             now=$(date -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S%z")
-            sed -i "s/last_saved:.*/last_saved: \"${now}\"/" progress.yaml 2>/dev/null || true
+            sed -i "s/last_saved:.*/last_saved: \"${now}\"/" "${state_dir}/progress.yaml" 2>/dev/null || true
 
             # 同步工作文件
             local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
@@ -91,21 +89,21 @@ start_timer() {
                 cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
             fi
 
-            # Git 操作，检测变化
-            git add -A
-            if ! git diff --cached --quiet; then
+            # Git 操作，使用 git -C 避免路径依赖
+            git -C "$state_dir" add -A
+            if ! git -C "$state_dir" diff --cached --quiet; then
                 # 有变化，创建 pending_log 标记
                 local diff_summary
-                diff_summary=$(git diff --cached --stat | tail -1)
-                echo "[$(date '+%Y-%m-%d %H:%M')] 文件变化: $diff_summary" > ".pending_log"
+                diff_summary=$(git -C "$state_dir" diff --cached --stat | tail -1)
+                echo "[$(date '+%Y-%m-%d %H:%M')] 文件变化: $diff_summary" > "${state_dir}/.pending_log"
 
-                git commit -m "auto-sync: $(date '+%Y-%m-%d %H:%M')" >> "$LOG_FILE" 2>&1
-                if git push origin main >> "$LOG_FILE" 2>&1; then
+                git -C "$state_dir" commit -m "auto-sync: $(date '+%Y-%m-%d %H:%M')" >> "$LOG_FILE" 2>&1
+                if git -C "$state_dir" push origin main >> "$LOG_FILE" 2>&1; then
                     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 同步成功（有变化）" >> "$LOG_FILE"
                 else
                     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 同步失败，将在下次重试" >> "$LOG_FILE"
                     # 尝试 pull rebase
-                    git pull --rebase origin main >> "$LOG_FILE" 2>&1 || true
+                    git -C "$state_dir" pull --rebase origin main >> "$LOG_FILE" 2>&1 || true
                 fi
             else
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 无变化，跳过" >> "$LOG_FILE"

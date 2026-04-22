@@ -41,22 +41,20 @@ resume-save() {
 
     # 3. Git 提交推送
     log_step "推送到 GitHub..."
-    cd "$state_dir"
-
-    git add -A
-    if git diff --cached --quiet; then
+    git -C "$state_dir" add -A
+    if git -C "$state_dir" diff --cached --quiet; then
         log_info "没有变化，跳过同步"
         return 0
     fi
 
     local commit_msg="save: ${message}"
-    git commit -m "$commit_msg"
+    git -C "$state_dir" commit -m "$commit_msg"
 
-    if git push origin main 2>/dev/null; then
+    if git -C "$state_dir" push origin main 2>/dev/null; then
         log_info "✅ 保存成功"
     else
         log_warn "推送失败，尝试 rebase..."
-        if git pull --rebase origin main 2>/dev/null && git push origin main 2>/dev/null; then
+        if git -C "$state_dir" pull --rebase origin main 2>/dev/null && git -C "$state_dir" push origin main 2>/dev/null; then
             log_info "✅ 保存成功（rebase 后）"
         else
             log_error "推送失败，下次自动同步会重试"

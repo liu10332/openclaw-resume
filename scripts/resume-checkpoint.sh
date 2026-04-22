@@ -55,7 +55,7 @@ $(head -20 "$progress_file" | grep -A 10 "position:" || echo "  unavailable: tru
 files_changed: []
 
 # Git 信息
-git_commit: "$(cd "$state_dir" && git rev-parse --short HEAD 2>/dev/null || echo 'none')"
+git_commit: "$(git -C "$state_dir" rev-parse --short HEAD 2>/dev/null || echo 'none')"
 EOF
 
     # 3. 追加到 progress.yaml 的 checkpoints 列表
@@ -67,10 +67,9 @@ EOF
     sync_workspace_to_state_cp "$state_dir"
 
     # 5. 提交推送
-    cd "$state_dir"
-    git add -A
-    git commit -m "checkpoint: #${checkpoint_id} - ${description}"
-    git push origin main 2>/dev/null || log_warn "推送失败，稍后自动同步会重试"
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "checkpoint: #${checkpoint_id} - ${description}"
+    git -C "$state_dir" push origin main 2>/dev/null || log_warn "推送失败，稍后自动同步会重试"
 
     log_info "✅ 检查点 #${checkpoint_id} 已创建: ${description}"
     log_info "   状态: pending_confirmation"
@@ -106,10 +105,9 @@ resume-checkpoint-confirm() {
     # 更新状态
     sed -i 's/status: "pending_confirmation"/status: "confirmed"/' "$checkpoint_file"
 
-    cd "$state_dir"
-    git add -A
-    git commit -m "confirm: checkpoint #${checkpoint_id}"
-    git push origin main 2>/dev/null || true
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "confirm: checkpoint #${checkpoint_id}"
+    git -C "$state_dir" push origin main 2>/dev/null || true
 
     log_info "✅ 检查点 #${checkpoint_id} 已确认"
 }

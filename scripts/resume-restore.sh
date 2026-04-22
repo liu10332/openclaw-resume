@@ -47,10 +47,9 @@ resume-restore() {
     # 2. 拉取最新状态
     log_step "从 GitHub 拉取最新状态..."
     if [ -d "$state_dir/.git" ]; then
-        cd "$state_dir"
-        git pull origin main 2>/dev/null || {
+        git -C "$state_dir" pull origin main 2>/dev/null || {
             log_warn "拉取失败，尝试 rebase..."
-            git pull --rebase origin main 2>/dev/null || log_warn "拉取失败，使用本地版本"
+            git -C "$state_dir" pull --rebase origin main 2>/dev/null || log_warn "拉取失败，使用本地版本"
         }
     else
         log_error "本地状态目录不存在，请先运行: resume-init ${project_name}"
@@ -133,10 +132,9 @@ resume-restore() {
     fi
 
     # 8. 提交会话开始
-    cd "$state_dir"
-    git add -A
-    git commit -m "restore: session ${session_id} started" 2>/dev/null || true
-    git push origin main 2>/dev/null || log_warn "推送失败，稍后自动同步会重试"
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "restore: session ${session_id} started" 2>/dev/null || true
+    git -C "$state_dir" push origin main 2>/dev/null || log_warn "推送失败，稍后自动同步会重试"
 
     # 8. 启动定时器
     log_step "启动自动同步定时器..."

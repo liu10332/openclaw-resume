@@ -71,11 +71,12 @@ generate_session_id() {
     local today
     today=$(date +%Y-%m-%d)
     local count=1
-    local state_dir="${OPENCLAW_RESUME_BASE}/${1:-}"
+    local project_name="${1:-}"
+    local state_dir="${OPENCLAW_RESUME_BASE}/${project_name}"
 
-    if [ -n "$state_dir" ] && [ -f "$state_dir/progress.yaml" ]; then
-        # 从 git 历史查找今天的会话数
-        count=$(cd "$state_dir" && git log --oneline --after="${today}T00:00:00" --grep="session_start" 2>/dev/null | wc -l)
+    if [ -n "$project_name" ] && [ -d "$state_dir/.git" ]; then
+        # 从 git 历史查找今天的会话数（使用 git -C 避免路径依赖）
+        count=$(git -C "$state_dir" log --oneline --after="${today}T00:00:00" --grep="session_start" 2>/dev/null | wc -l)
         count=$((count + 1))
     fi
 
@@ -141,8 +142,7 @@ add_log_entry() {
 
     local entry="  - \"${time_str} ${entry_text}\""
 
-    # 追加到 log 列表（在 log: 行之后）
-    sed -i "/^log:/{n;s/^  -/  -/;}" "$progress_file" 2>/dev/null || true
+    # 追加到 log 列表末尾（在文件末尾追加）
     echo "$entry" >> "$progress_file"
 }
 

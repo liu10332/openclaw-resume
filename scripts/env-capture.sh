@@ -23,10 +23,9 @@ resume-env() {
     log_step "捕获环境依赖: ${project_name}"
     capture_environment "$state_dir"
 
-    cd "$state_dir"
-    git add -A
-    git commit -m "env: capture environment dependencies" 2>/dev/null || log_info "没有环境变化"
-    git push origin main 2>/dev/null || true
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "env: capture environment dependencies" 2>/dev/null || log_info "没有环境变化"
+    git -C "$state_dir" push origin main 2>/dev/null || true
 
     log_info "✅ 环境依赖已捕获"
 }
