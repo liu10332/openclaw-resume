@@ -3,8 +3,8 @@
 # resume-init: 初始化项目状态仓库
 # ========================================
 
-source "$(dirname "$0")/core.sh"
-source "$(dirname "$0")/env-capture.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/env-capture.sh"
 
 resume-init() {
     local project_name="${1:-}"
@@ -18,6 +18,7 @@ resume-init() {
 
     # 1. 检查前置条件
     check_prerequisites || return 1
+    validate_pat || log_warn "PAT 验证失败，继续尝试..."
 
     local state_dir
     state_dir=$(get_state_dir "$project_name")
@@ -71,7 +72,7 @@ resume-init() {
     local expires
     expires=$(calc_expires_at)
 
-    cp "$(dirname "$0")/../templates/progress.yaml" "$state_dir/progress.yaml"
+    cp "$(dirname "${BASH_SOURCE[0]}")/../templates/progress.yaml" "$state_dir/progress.yaml"
 
     # 填充初始值
     yaml_set "$state_dir/progress.yaml" "session.id" "$session_id"
@@ -126,7 +127,7 @@ EOF
 
     # 10. 询问剩余时间
     log_step "设置环境剩余时间..."
-    bash "$(dirname "$0")/resume-ask-time.sh" "$project_name" "60"
+    bash "$(dirname "${BASH_SOURCE[0]}")/resume-ask-time.sh" "$project_name" "60"
 
     log_info "下一步:"
     log_info "  1. 正常工作..."

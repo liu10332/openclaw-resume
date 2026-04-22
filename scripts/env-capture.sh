@@ -3,7 +3,7 @@
 # env-capture: 捕获环境依赖
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-env() {
     local project_name="${1:-}"
@@ -100,7 +100,7 @@ generate_setup_script() {
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="/tmp/openclaw-resume-setup.log"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }

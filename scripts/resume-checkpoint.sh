@@ -3,7 +3,7 @@
 # resume-checkpoint: 创建检查点
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-checkpoint() {
     local description="${1:-}"

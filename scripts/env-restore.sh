@@ -4,7 +4,7 @@
 # 可单独执行，也可被 resume-restore 调用
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 env-restore() {
     local project_name="${1:-}"

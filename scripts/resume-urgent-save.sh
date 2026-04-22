@@ -1,21 +1,22 @@
 #!/bin/bash
 # ========================================
-# resume-save: 手动保存当前状态
+# resume-urgent-save: 紧急保存（时间不足时触发）
+# 当剩余时间 < 阈值时自动保存并推送
 # ========================================
 
 source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
-resume-save() {
-    local message="${1:-manual save}"
-    local project_name="${2:-}"
+URGENT_THRESHOLD_MIN="${URGENT_THRESHOLD_MIN:-5}"
 
-    # 自动检测当前活动项目
+resume-urgent-save() {
+    local project_name="${1:-}"
+
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project)
+        project_name=$(detect_active_project_urgent)
     fi
 
     if [ -z "$project_name" ]; then
-        log_error "无法检测活动项目，请指定: resume-save [message] <project-name>"
+        log_error "无法检测活动项目"
         return 1
     fi
 
@@ -24,49 +25,26 @@ resume-save() {
     local progress_file="${state_dir}/progress.yaml"
 
     if [ ! -f "$progress_file" ]; then
-        log_error "progress.yaml 不存在，请先运行 resume-init"
+        log_error "progress.yaml 不存在"
         return 1
     fi
 
-    # 1. 同步工作文件到状态目录
-    log_step "同步工作文件..."
-    sync_workspace_to_state "$state_dir"
+    # 检查剩余时间
+    local remaining
+    remaining=$(bash "$(dirname "${BASH_SOURCE[0]}")/resume-time-remaining.sh" "$project_name" 2>/dev/null || echo "0")
 
-    # 2. 更新 progress.yaml
-    log_step "更新进度..."
-    local now
-    now=$(now_iso)
-    yaml_set "$progress_file" "session.last_saved" "$now"
-    add_log_entry "$state_dir" "$message"
-
-    # 3. Git 提交推送
-    log_step "推送到 GitHub..."
-    git -C "$state_dir" add -A
-    if git -C "$state_dir" diff --cached --quiet; then
-        log_info "没有变化，跳过同步"
+    if [ "$remaining" -gt "$URGENT_THRESHOLD_MIN" ] 2>/dev/null; then
+        log_info "剩余 ${remaining} 分钟，无需紧急保存"
         return 0
     fi
 
-    local commit_msg="save: ${message}"
-    git -C "$state_dir" commit -m "$commit_msg"
+    log_warn "⚠️  剩余不足 ${URGENT_THRESHOLD_MIN} 分钟！执行紧急保存..."
 
-    if git_push_safe "$state_dir"; then
-        log_info "✅ 保存成功"
-    else
-        log_error "推送失败，下次自动同步会重试"
-        return 1
-    fi
-}
-
-# 同步工作目录到状态目录
-sync_workspace_to_state() {
-    local state_dir="$1"
+    # 同步工作文件
     local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
     local workspace_dst="${state_dir}/workspace"
-
     mkdir -p "$workspace_dst"
 
-    # 使用 rsync 如果可用，否则用 cp
     if command -v rsync &>/dev/null; then
         rsync -a --delete \
             --exclude='node_modules' \
@@ -76,14 +54,34 @@ sync_workspace_to_state() {
             --exclude='*.pyc' \
             "$workspace_src/" "$workspace_dst/" 2>/dev/null || true
     else
-        # 简单复制（不删除已有文件）
         cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
+    fi
+
+    # 更新进度
+    local now
+    now=$(now_iso)
+    yaml_set "$progress_file" "session.last_saved" "$now"
+    add_log_entry "$state_dir" "⚠️ 紧急保存（剩余 ${remaining} 分钟）"
+
+    # 提交推送
+    git -C "$state_dir" add -A
+    if git -C "$state_dir" diff --cached --quiet; then
+        log_info "无变化，跳过"
+        return 0
+    fi
+
+    git -C "$state_dir" commit -m "urgent-save: 剩余 ${remaining} 分钟"
+    if git_push_safe "$state_dir" 5; then
+        log_info "✅ 紧急保存完成"
+    else
+        log_error "紧急保存推送失败！"
+        log_info "数据已保存在本地: ${state_dir}"
+        return 1
     fi
 }
 
-# 检测当前活动项目
-detect_active_project() {
-    # 从最近修改的 progress.yaml 中检测
+# 检测活动项目
+detect_active_project_urgent() {
     local latest=""
     local latest_time=0
 
@@ -100,11 +98,10 @@ detect_active_project() {
             fi
         done
     fi
-
     echo "$latest"
 }
 
-# 如果直接执行此脚本
+# 如果直接执行
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    resume-save "$@"
+    resume-urgent-save "$@"
 fi

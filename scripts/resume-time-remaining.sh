@@ -4,7 +4,7 @@
 # 返回剩余分钟数（整数）
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-time-remaining() {
     local project_name="${1:-}"

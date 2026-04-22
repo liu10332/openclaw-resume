@@ -3,7 +3,7 @@
 # resume-status: 查看当前状态
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-status() {
     local project_name="${1:-}"

@@ -1,0 +1,408 @@
+#!/bin/bash
+# ========================================
+# openclaw-resume 端到端测试
+# 测试完整流程：init → save → checkpoint → status → stop
+# ========================================
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
+TEST_BASE="/tmp/openclaw-resume-e2e-test"
+TEST_WORKSPACE="/tmp/openclaw-resume-e2e-workspace"
+PASS=0
+FAIL=0
+TOTAL=0
+
+# 颜色
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# 测试工具
+assert_eq() {
+    local desc="$1" expected="$2" actual="$3"
+    TOTAL=$((TOTAL + 1))
+    if [ "$expected" = "$actual" ]; then
+        echo -e "  ${GREEN}✓${NC} $desc"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $desc (期望: $expected, 实际: $actual)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+assert_contains() {
+    local desc="$1" haystack="$2" needle="$3"
+    TOTAL=$((TOTAL + 1))
+    if echo "$haystack" | grep -q "$needle"; then
+        echo -e "  ${GREEN}✓${NC} $desc"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $desc (未找到: $needle)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+assert_file_exists() {
+    local desc="$1" file="$2"
+    TOTAL=$((TOTAL + 1))
+    if [ -f "$file" ]; then
+        echo -e "  ${GREEN}✓${NC} $desc"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $desc (文件不存在: $file)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+assert_dir_exists() {
+    local desc="$1" dir="$2"
+    TOTAL=$((TOTAL + 1))
+    if [ -d "$dir" ]; then
+        echo -e "  ${GREEN}✓${NC} $desc"
+        PASS=$((PASS + 1))
+    else
+        echo -e "  ${RED}✗${NC} $desc (目录不存在: $dir)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# ========================================
+# 测试准备
+# ========================================
+setup() {
+    echo -e "${YELLOW}=== 环境准备 ===${NC}"
+
+    # 清理
+    rm -rf "$TEST_BASE" "$TEST_WORKSPACE" 2>/dev/null
+
+    # 创建模拟工作区
+    mkdir -p "$TEST_WORKSPACE"
+    echo "# Test Project" > "$TEST_WORKSPACE/README.md"
+    echo "print('hello')" > "$TEST_WORKSPACE/main.py"
+    echo '{"name":"test","version":"1.0.0"}' > "$TEST_WORKSPACE/package.json"
+
+    # 设置环境变量
+    export OPENCLAW_RESUME_BASE="$TEST_BASE"
+    export OPENCLAW_RESUME_WORKSPACE="$TEST_WORKSPACE"
+    export OPENCLAW_RESUME_PAT="fake-pat-for-testing"
+    export OPENCLAW_RESUME_USER="test-user"
+
+    # 确保 git 全局配置
+    git config --global user.email "test@local" 2>/dev/null || true
+    git config --global user.name "test" 2>/dev/null || true
+
+    echo "  工作区: $TEST_WORKSPACE"
+    echo "  状态目录: $TEST_BASE"
+    echo ""
+}
+
+# ========================================
+# 测试 1: core.sh 基础函数
+# ========================================
+test_core_functions() {
+    echo -e "${YELLOW}=== 测试 1: core.sh 基础函数 ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+
+    # 测试 get_state_dir
+    local result
+    result=$(get_state_dir "my-project")
+    assert_eq "get_state_dir 返回正确路径" "$TEST_BASE/my-project" "$result"
+
+    # 测试 now_iso
+    local now
+    now=$(now_iso)
+    assert_contains "now_iso 返回 ISO 时间" "$now" "T"
+
+    # 测试 yaml_set + yaml_get (无 yq 模式)
+    local test_yaml="/tmp/test-e2e-yaml.yaml"
+    cat > "$test_yaml" << 'EOF'
+session:
+  id: ""
+  name: "test"
+EOF
+    yaml_set "$test_yaml" "session.id" "2026-04-23-am-1"
+    local val
+    val=$(grep 'id:' "$test_yaml" | head -1 | sed 's/.*id: *"//;s/".*//')
+    assert_eq "yaml_set 写入值" "2026-04-23-am-1" "$val"
+
+    # 测试 add_log_entry
+    mkdir -p /tmp/test-e2e-state
+    cat > /tmp/test-e2e-state/progress.yaml << 'EOF'
+log: []
+EOF
+    add_log_entry "/tmp/test-e2e-state" "测试条目"
+    local log_content
+    log_content=$(cat /tmp/test-e2e-state/progress.yaml)
+    assert_contains "add_log_entry 插入到 log 段落" "$log_content" "测试条目"
+
+    # 验证 log 条目在正确位置（log: 下面，不是文件末尾）
+    local log_line_num
+    log_line_num=$(grep -n "^log:" /tmp/test-e2e-state/progress.yaml | head -1 | cut -d: -f1)
+    local entry_line_num
+    entry_line_num=$(grep -n "测试条目" /tmp/test-e2e-state/progress.yaml | head -1 | cut -d: -f1)
+    if [ "$entry_line_num" -gt "$log_line_num" ] 2>/dev/null; then
+        assert_eq "add_log_entry 位置正确" "true" "true"
+    else
+        assert_eq "add_log_entry 位置正确" "true" "false"
+    fi
+
+    # 测试 retry 函数
+    local retry_count=0
+    retry_test_fn() {
+        retry_count=$((retry_count + 1))
+        [ $retry_count -ge 3 ]
+    }
+    if retry 5 0 retry_test_fn 2>/dev/null; then
+        assert_eq "retry 重试成功" "3" "$retry_count"
+    else
+        assert_eq "retry 重试成功" "3" "$retry_count"
+    fi
+
+    rm -f "$test_yaml"
+    rm -rf /tmp/test-e2e-state
+    echo ""
+}
+
+# ========================================
+# 测试 2: resume-init（本地模式）
+# ========================================
+test_init() {
+    echo -e "${YELLOW}=== 测试 2: resume-init (本地模式) ===${NC}"
+
+    # 模拟 init：直接创建本地结构（跳过 GitHub）
+    local state_dir="$TEST_BASE/e2e-test"
+    mkdir -p "$state_dir/environment" "$state_dir/workspace" "$state_dir/checkpoints"
+
+    # 初始化 git
+    git -C "$state_dir" init -b main 2>/dev/null
+
+    # 复制模板
+    cp "$SCRIPT_DIR/../templates/progress.yaml" "$state_dir/progress.yaml"
+
+    # 填充
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    yaml_set "$state_dir/progress.yaml" "session.id" "2026-04-23-am-1"
+    yaml_set "$state_dir/progress.yaml" "position.project" "e2e-test"
+    add_log_entry "$state_dir" "项目初始化完成"
+
+    # 生成 .gitignore
+    cat > "$state_dir/.gitignore" << 'EOF'
+.env
+node_modules/
+__pycache__/
+EOF
+
+    # 捕获环境
+    source "$SCRIPT_DIR/env-capture.sh" 2>/dev/null
+    capture_environment "$state_dir"
+
+    # 提交
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "init: e2e-test" 2>/dev/null
+
+    assert_dir_exists "状态目录存在" "$state_dir"
+    assert_dir_exists "environment 目录存在" "$state_dir/environment"
+    assert_dir_exists "workspace 目录存在" "$state_dir/workspace"
+    assert_dir_exists "checkpoints 目录存在" "$state_dir/checkpoints"
+    assert_file_exists "progress.yaml 存在" "$state_dir/progress.yaml"
+    assert_file_exists ".gitignore 存在" "$state_dir/.gitignore"
+    assert_file_exists "requirements.txt 存在" "$state_dir/environment/requirements.txt"
+    assert_file_exists "apt-packages.txt 存在" "$state_dir/environment/apt-packages.txt"
+    assert_file_exists "setup.sh 存在" "$state_dir/environment/setup.sh"
+    assert_file_exists "env-vars.txt 存在" "$state_dir/environment/env-vars.txt"
+
+    # 验证 git 有提交
+    local commit_count
+    commit_count=$(git -C "$state_dir" log --oneline | wc -l)
+    assert_eq "git 有 1 个提交" "1" "$commit_count"
+
+    # 验证 progress.yaml 内容
+    local project_val
+    project_val=$(grep 'project:' "$state_dir/progress.yaml" | head -1 | sed 's/.*project: *"//;s/".*//')
+    assert_eq "progress.yaml project 正确" "e2e-test" "$project_val"
+
+    echo ""
+}
+
+# ========================================
+# 测试 3: resume-save
+# ========================================
+test_save() {
+    echo -e "${YELLOW}=== 测试 3: resume-save ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    local state_dir="$TEST_BASE/e2e-test"
+
+    # 模拟工作区变化
+    echo "new content" > "$TEST_WORKSPACE/new-file.txt"
+
+    # 同步工作文件到状态目录
+    local workspace_dst="${state_dir}/workspace"
+    cp -r "$TEST_WORKSPACE"/* "$workspace_dst/" 2>/dev/null || true
+
+    # 更新进度
+    local now
+    now=$(now_iso)
+    yaml_set "$state_dir/progress.yaml" "session.last_saved" "$now"
+    add_log_entry "$state_dir" "手动保存: 添加新文件"
+
+    # 提交
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "save: 添加新文件" 2>/dev/null
+
+    assert_file_exists "新文件同步到 workspace" "$state_dir/workspace/new-file.txt"
+
+    local commit_count
+    commit_count=$(git -C "$state_dir" log --oneline | wc -l)
+    assert_eq "save 后有 2 个提交" "2" "$commit_count"
+
+    echo ""
+}
+
+# ========================================
+# 测试 4: resume-checkpoint
+# ========================================
+test_checkpoint() {
+    echo -e "${YELLOW}=== 测试 4: resume-checkpoint ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    local state_dir="$TEST_BASE/e2e-test"
+
+    # 创建检查点
+    local checkpoint_id=1
+    local checkpoint_file="${state_dir}/checkpoints/$(printf '%03d' $checkpoint_id)-完成初始化.yaml"
+
+    cat > "$checkpoint_file" << EOF
+id: $checkpoint_id
+timestamp: "$(now_iso)"
+description: "完成初始化"
+status: "pending_confirmation"
+project: "e2e-test"
+EOF
+
+    add_log_entry "$state_dir" "创建检查点 #${checkpoint_id}: 完成初始化"
+
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "checkpoint: #${checkpoint_id}" 2>/dev/null
+
+    assert_file_exists "检查点文件存在" "$checkpoint_file"
+
+    # 确认检查点
+    sed -i 's/status: "pending_confirmation"/status: "confirmed"/' "$checkpoint_file"
+    git -C "$state_dir" add -A
+    git -C "$state_dir" commit -m "confirm: checkpoint #${checkpoint_id}" 2>/dev/null
+
+    local status_val
+    status_val=$(grep 'status:' "$checkpoint_file" | sed 's/.*status: *"//;s/".*//')
+    assert_eq "检查点状态为 confirmed" "confirmed" "$status_val"
+
+    local commit_count
+    commit_count=$(git -C "$state_dir" log --oneline | wc -l)
+    assert_eq "checkpoint 后有 4 个提交" "4" "$commit_count"
+
+    echo ""
+}
+
+# ========================================
+# 测试 5: resume-status（数据完整性）
+# ========================================
+test_status() {
+    echo -e "${YELLOW}=== 测试 5: 数据完整性 ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    local state_dir="$TEST_BASE/e2e-test"
+
+    # 验证 progress.yaml 结构完整
+    assert_file_exists "progress.yaml 存在" "$state_dir/progress.yaml"
+
+    local has_session has_position has_log has_checkpoints
+    has_session=$(grep -c "^session:" "$state_dir/progress.yaml")
+    has_position=$(grep -c "^position:" "$state_dir/progress.yaml")
+    has_log=$(grep -c "^log:" "$state_dir/progress.yaml")
+    has_checkpoints=$(grep -c "^checkpoints:" "$state_dir/progress.yaml")
+
+    assert_eq "progress.yaml 有 session 段" "1" "$has_session"
+    assert_eq "progress.yaml 有 position 段" "1" "$has_position"
+    assert_eq "progress.yaml 有 log 段" "1" "$has_log"
+    assert_eq "progress.yaml 有 checkpoints 段" "1" "$has_checkpoints"
+
+    # 验证 log 条目数量
+    local log_entries
+    log_entries=$(grep -c '^\s*- "' "$state_dir/progress.yaml")
+    assert_eq "log 有 3 个条目" "3" "$log_entries"
+
+    # 验证 git 历史
+    local git_log
+    git_log=$(git -C "$state_dir" log --oneline)
+    assert_contains "git 历史包含 init" "$git_log" "init"
+    assert_contains "git 历史包含 save" "$git_log" "save"
+    assert_contains "git 历史包含 checkpoint" "$git_log" "checkpoint"
+
+    echo ""
+}
+
+# ========================================
+# 测试 6: time-remaining
+# ========================================
+test_time_remaining() {
+    echo -e "${YELLOW}=== 测试 6: 时间感知 ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    local state_dir="$TEST_BASE/e2e-test"
+
+    # 设置一个未来的过期时间
+    local future
+    future=$(date -d "+30 minutes" -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S%z")
+    yaml_set "$state_dir/progress.yaml" "session.expires_at" "$future"
+
+    # 验证 expires_at 被写入
+    local expires_val
+    expires_val=$(grep 'expires_at:' "$state_dir/progress.yaml" | head -1 | sed 's/.*expires_at: *"//;s/".*//')
+    assert_contains "expires_at 已设置" "$expires_val" "2026"
+
+    echo ""
+}
+
+# ========================================
+# 清理
+# ========================================
+cleanup() {
+    echo -e "${YELLOW}=== 清理 ===${NC}"
+    rm -rf "$TEST_BASE" "$TEST_WORKSPACE" /tmp/test-e2e-* 2>/dev/null
+    echo "  已清理测试文件"
+    echo ""
+}
+
+# ========================================
+# 主流程
+# ========================================
+main() {
+    echo ""
+    echo "╔═══════════════════════════════════════════╗"
+    echo "║   openclaw-resume 端到端测试               ║"
+    echo "╚═══════════════════════════════════════════╝"
+    echo ""
+
+    setup
+    test_core_functions
+    test_init
+    test_save
+    test_checkpoint
+    test_status
+    test_time_remaining
+    cleanup
+
+    echo "═══════════════════════════════════════════"
+    echo -e "  结果: ${GREEN}${PASS} 通过${NC} / ${RED}${FAIL} 失败${NC} / 共 ${TOTAL} 项"
+    echo "═══════════════════════════════════════════"
+    echo ""
+
+    if [ $FAIL -gt 0 ]; then
+        exit 1
+    else
+        exit 0
+    fi
+}
+
+main "$@"

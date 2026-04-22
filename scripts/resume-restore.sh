@@ -3,7 +3,7 @@
 # resume-restore: 从 GitHub 恢复上次状态
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-restore() {
     local project_name="${1:-}"
@@ -47,10 +47,7 @@ resume-restore() {
     # 2. 拉取最新状态
     log_step "从 GitHub 拉取最新状态..."
     if [ -d "$state_dir/.git" ]; then
-        git -C "$state_dir" pull origin main 2>/dev/null || {
-            log_warn "拉取失败，尝试 rebase..."
-            git -C "$state_dir" pull --rebase origin main 2>/dev/null || log_warn "拉取失败，使用本地版本"
-        }
+        git_pull_safe "$state_dir" || log_warn "拉取失败，使用本地版本"
     else
         log_error "本地状态目录不存在，请先运行: resume-init ${project_name}"
         return 1
@@ -134,17 +131,17 @@ resume-restore() {
     # 8. 提交会话开始
     git -C "$state_dir" add -A
     git -C "$state_dir" commit -m "restore: session ${session_id} started" 2>/dev/null || true
-    git -C "$state_dir" push origin main 2>/dev/null || log_warn "推送失败，稍后自动同步会重试"
+    git_push_safe "$state_dir" || log_warn "推送失败，稍后自动同步会重试"
 
     # 8. 启动定时器
     log_step "启动自动同步定时器..."
-    bash "$(dirname "$0")/resume-timer.sh" start "$project_name"
+    bash "$(dirname "${BASH_SOURCE[0]}")/resume-timer.sh" start "$project_name"
 
     log_info "✅ 恢复完成，继续上次的工作吧"
 
     # 9. 询问剩余时间
     log_step "设置环境剩余时间..."
-    bash "$(dirname "$0")/resume-ask-time.sh" "$project_name" ""
+    bash "$(dirname "${BASH_SOURCE[0]}")/resume-ask-time.sh" "$project_name" ""
 }
 
 # 如果直接执行此脚本

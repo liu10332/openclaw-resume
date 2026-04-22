@@ -28,6 +28,110 @@ log_warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $*"; }
 log_step()    { echo -e "${BLUE}[STEP]${NC} $*"; }
 
+# ========================================
+# 错误处理工具
+# ========================================
+
+# 重试包装器：retry <max_attempts> <delay_seconds> <command...>
+retry() {
+    local max_attempts="$1"
+    local delay="$2"
+    shift 2
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        if "$@"; then
+            return 0
+        fi
+        if [ $attempt -lt $max_attempts ]; then
+            log_warn "第 ${attempt}/${max_attempts} 次失败，${delay}s 后重试..."
+            sleep "$delay"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    log_error "重试 ${max_attempts} 次后仍然失败: $*"
+    return 1
+}
+
+# 带重试的 git push
+git_push_safe() {
+    local state_dir="$1"
+    local max_retries="${2:-3}"
+
+    for i in $(seq 1 "$max_retries"); do
+        if git -C "$state_dir" push origin main 2>/dev/null; then
+            return 0
+        fi
+
+        if [ $i -lt "$max_retries" ]; then
+            log_warn "push 失败 (${i}/${max_retries})，尝试 pull rebase..."
+            git -C "$state_dir" pull --rebase origin main 2>/dev/null || true
+            sleep 2
+        fi
+    done
+
+    log_error "push 失败，已重试 ${max_retries} 次"
+    return 1
+}
+
+# 带重试的 git pull
+git_pull_safe() {
+    local state_dir="$1"
+    local max_retries="${2:-3}"
+
+    for i in $(seq 1 "$max_retries"); do
+        if git -C "$state_dir" pull origin main 2>/dev/null; then
+            return 0
+        fi
+
+        if [ $i -lt "$max_retries" ]; then
+            log_warn "pull 失败 (${i}/${max_retries})，尝试 rebase..."
+            git -C "$state_dir" pull --rebase origin main 2>/dev/null && return 0
+            sleep 2
+        fi
+    done
+
+    log_error "pull 失败，已重试 ${max_retries} 次"
+    return 1
+}
+
+# 验证 GitHub PAT 是否有效
+validate_pat() {
+    if [ -z "${OPENCLAW_RESUME_PAT:-}" ]; then
+        log_error "OPENCLAW_RESUME_PAT 未设置"
+        return 1
+    fi
+
+    local http_code
+    http_code=$(timeout 10 curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token ${OPENCLAW_RESUME_PAT}" \
+        "https://api.github.com/user" 2>/dev/null || echo "000")
+
+    case "$http_code" in
+        200) return 0 ;;
+        401) log_error "PAT 无效或已过期"; return 1 ;;
+        403) log_error "PAT 权限不足"; return 1 ;;
+        000) log_warn "无法连接 GitHub API（网络问题）"; return 0 ;;  # 网络问题不阻断
+        *)   log_warn "GitHub API 返回 ${http_code}"; return 0 ;;
+    esac
+}
+
+# 验证 GitHub 仓库是否存在
+validate_repo() {
+    local repo_url="$1"
+    local http_code
+    http_code=$(timeout 10 curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token ${OPENCLAW_RESUME_PAT}" \
+        "$repo_url" 2>/dev/null || echo "000")
+
+    case "$http_code" in
+        200) return 0 ;;
+        404) return 1 ;;
+        *)   return 0 ;;  # 其他情况不阻断
+    esac
+}
+
 # 检查前置条件
 check_prerequisites() {
     local missing=0

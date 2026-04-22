@@ -3,7 +3,7 @@
 # resume-timer: 自动同步定时器管理
 # ========================================
 
-source "$(dirname "$0")/core.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 SYNC_INTERVAL=900  # 15分钟
 PID_FILE="/tmp/openclaw-resume-sync.pid"
@@ -67,6 +67,17 @@ start_timer() {
             # 执行同步
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] 执行自动同步..." >> "$LOG_FILE"
 
+            # 检查剩余时间，不足 5 分钟时触发紧急保存
+            local remaining_min
+            remaining_min=$(bash "$(dirname "${BASH_SOURCE[0]}")/resume-time-remaining.sh" "$project_name" 2>/dev/null || echo "99")
+            if [ "$remaining_min" -le 5 ] 2>/dev/null && [ "$remaining_min" -gt 0 ] 2>/dev/null; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️ 剩余 ${remaining_min} 分钟，触发紧急保存..." >> "$LOG_FILE"
+                bash "$(dirname "${BASH_SOURCE[0]}")/resume-urgent-save.sh" "$project_name" >> "$LOG_FILE" 2>&1
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] 紧急保存完成，定时器停止" >> "$LOG_FILE"
+                rm -f "$PID_FILE"
+                break
+            fi
+
             # 更新 last_saved
             local now
             now=$(date -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S%z")
@@ -98,12 +109,21 @@ start_timer() {
                 echo "[$(date '+%Y-%m-%d %H:%M')] 文件变化: $diff_summary" > "${state_dir}/.pending_log"
 
                 git -C "$state_dir" commit -m "auto-sync: $(date '+%Y-%m-%d %H:%M')" >> "$LOG_FILE" 2>&1
-                if git -C "$state_dir" push origin main >> "$LOG_FILE" 2>&1; then
+                # 带重试的 push
+                local push_ok=false
+                for try in 1 2 3; do
+                    if git -C "$state_dir" push origin main >> "$LOG_FILE" 2>&1; then
+                        push_ok=true
+                        break
+                    fi
+                    [ $try -lt 3 ] && git -C "$state_dir" pull --rebase origin main >> "$LOG_FILE" 2>&1 || true
+                    [ $try -lt 3 ] && sleep 2
+                done
+
+                if $push_ok; then
                     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 同步成功（有变化）" >> "$LOG_FILE"
                 else
                     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 同步失败，将在下次重试" >> "$LOG_FILE"
-                    # 尝试 pull rebase
-                    git -C "$state_dir" pull --rebase origin main >> "$LOG_FILE" 2>&1 || true
                 fi
             else
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 无变化，跳过" >> "$LOG_FILE"
@@ -131,7 +151,7 @@ stop_timer() {
             local project_name
             project_name=$(detect_active_project_timer)
             if [ -n "$project_name" ]; then
-                bash "$(dirname "$0")/resume-save.sh" "timer_stopped: final sync" "$project_name"
+                bash "$(dirname "${BASH_SOURCE[0]}")/resume-save.sh" "timer_stopped: final sync" "$project_name"
             fi
         else
             rm "$PID_FILE"
