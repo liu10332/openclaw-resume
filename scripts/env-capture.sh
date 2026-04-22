@@ -47,7 +47,21 @@ capture_environment() {
         dpkg --get-selections 2>/dev/null | grep -v deinstall > "${env_dir}/apt-packages.txt" || true
     fi
 
-    # 3. 关键环境变量
+    # 3. Node.js 依赖
+    log_info "  捕获 Node.js 依赖..."
+    if command -v npm &>/dev/null; then
+        # 全局包列表
+        npm ls -g --depth=0 --json 2>/dev/null > "${env_dir}/npm-global.json" || true
+        # 工作区 package.json（如果存在）
+        if [ -f "${OPENCLAW_RESUME_WORKSPACE}/package.json" ]; then
+            cp "${OPENCLAW_RESUME_WORKSPACE}/package.json" "${env_dir}/package.json" 2>/dev/null || true
+            # lock 文件
+            [ -f "${OPENCLAW_RESUME_WORKSPACE}/package-lock.json" ] && \
+                cp "${OPENCLAW_RESUME_WORKSPACE}/package-lock.json" "${env_dir}/package-lock.json" 2>/dev/null || true
+        fi
+    fi
+
+    # 4. 关键环境变量
     log_info "  捕获环境变量..."
     {
         echo "# 关键环境变量快照"
@@ -155,10 +169,20 @@ if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
 fi
 
 # 3. Node.js 依赖
-if [ -f "$SCRIPT_DIR/../workspace/package.json" ] && command -v npm &>/dev/null; then
-    log "安装 Node.js 依赖..."
-    cd "$SCRIPT_DIR/../workspace"
-    npm install --silent 2>/dev/null || log "Node.js 依赖安装失败"
+if command -v npm &>/dev/null; then
+    # 优先用 environment 目录下的 package.json
+    if [ -f "$SCRIPT_DIR/package.json" ]; then
+        log "安装 Node.js 依赖 (from environment)..."
+        WORK_DIR=$(mktemp -d)
+        cp "$SCRIPT_DIR/package.json" "$WORK_DIR/"
+        [ -f "$SCRIPT_DIR/package-lock.json" ] && cp "$SCRIPT_DIR/package-lock.json" "$WORK_DIR/"
+        cd "$WORK_DIR" && npm install --silent 2>/dev/null || log "Node.js 依赖安装失败"
+        rm -rf "$WORK_DIR"
+    elif [ -f "$SCRIPT_DIR/../workspace/package.json" ]; then
+        log "安装 Node.js 依赖 (from workspace)..."
+        cd "$SCRIPT_DIR/../workspace"
+        npm install --silent 2>/dev/null || log "Node.js 依赖安装失败"
+    fi
 fi
 
 log "=== 环境恢复完成 ==="

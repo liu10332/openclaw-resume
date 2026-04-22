@@ -113,15 +113,29 @@ resume-checkpoint <description>
 ### 捕获环境
 
 ```bash
-source scripts/resume-env.sh
-resume-env
+source scripts/env-capture.sh
+resume-env [project-name]
 ```
 
 功能：
 - pip freeze → requirements.txt
-- 检测 package.json
+- npm ls -g → npm-global.json
+- 检测 package.json + package-lock.json
 - dpkg --get-selections → apt-packages.txt
+- 捕获关键环境变量
 - 生成 setup.sh
+
+### 恢复环境
+
+```bash
+source scripts/env-restore.sh
+env-restore [project-name]
+```
+
+功能：
+- 执行 setup.sh（apt + pip + npm 差异安装）
+- 恢复 package.json 到工作区
+- 独立运行，不依赖 resume-restore
 
 ### 查看状态
 

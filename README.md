@@ -58,7 +58,8 @@ resume-timer stop            # 停止定时器（自动做最后一次保存）
 | `resume-save [msg]` | 手动保存当前状态 |
 | `resume-checkpoint <desc>` | 创建检查点（待确认） |
 | `resume-checkpoint-confirm <id>` | 确认检查点 |
-| `resume-env` | 捕获当前环境依赖 |
+| `resume-env [name]` | 捕获当前环境依赖 |
+| `env-restore [name]` | 独立恢复环境依赖 |
 | `resume-status` | 显示进度面板 |
 | `resume-timer start/stop/status` | 管理自动同步定时器 |
 
