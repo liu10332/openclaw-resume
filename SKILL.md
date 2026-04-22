@@ -37,7 +37,26 @@ OpenClaw 限时试用环境（1小时）的跨会话续接工具。
 
 ## 命令
 
-### 初始化新项目
+### 一键初始化（任意机器，无需 OpenClaw）
+
+```bash
+# 下载脚本
+curl -O https://raw.githubusercontent.com/liu10332/openclaw-resume/master/quick-init.sh
+chmod +x quick-init.sh
+
+# 三步使用
+bash quick-init.sh init <项目名> <工作目录>   # 初始化（不推送）
+bash quick-init.sh add <项目名> <文件...>      # 添加额外文件
+bash quick-init.sh push <项目名>              # 推送到 GitHub
+
+# 一步完成
+bash quick-init.sh init my-project ./code && bash quick-init.sh push my-project
+
+# 查看状态
+bash quick-init.sh status [项目名]
+```
+
+### 初始化新项目（OpenClaw 环境）
 
 ```bash
 source scripts/resume-init.sh
