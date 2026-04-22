@@ -113,10 +113,10 @@ resume-restore() {
     local expires
     expires=$(calc_expires_at)
 
-    yaml_set progress_file "session.id" "$session_id"
-    yaml_set progress_file "session.started" "$now"
-    yaml_set progress_file "session.expires_at" "$expires"
-    yaml_set progress_file "session.last_saved" "$now"
+    yaml_set "$progress_file" "session.id" "$session_id"
+    yaml_set "$progress_file" "session.started" "$now"
+    yaml_set "$progress_file" "session.expires_at" "$expires"
+    yaml_set "$progress_file" "session.last_saved" "$now"
 
     add_log_entry "$state_dir" "从检查点恢复，继续工作"
 

@@ -36,7 +36,7 @@ resume-save() {
     log_step "更新进度..."
     local now
     now=$(now_iso)
-    yaml_set progress_file "session.last_saved" "$now"
+    yaml_set "$progress_file" "session.last_saved" "$now"
     add_log_entry "$state_dir" "$message"
 
     # 3. Git 提交推送

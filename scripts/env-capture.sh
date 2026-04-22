@@ -69,8 +69,8 @@ capture_environment() {
         local py_ver
         py_ver=$(python3 --version 2>/dev/null | awk '{print $2}' || echo "unknown")
 
-        yaml_set progress_file "environment_snapshot.captured_at" "$now"
-        yaml_set progress_file "environment_snapshot.python_version" "$py_ver"
+        yaml_set "$progress_file" "environment_snapshot.captured_at" "$now"
+        yaml_set "$progress_file" "environment_snapshot.python_version" "$py_ver"
     fi
 }
 

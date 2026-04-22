@@ -29,17 +29,16 @@ resume-init() {
         return 0
     fi
 
-    # 3. 创建 GitHub 仓库（使用 gh CLI 或提示手动创建）
-    log_step "创建 GitHub 仓库..."
+    # 3. 创建 GitHub 仓库（使用 gh CLI）
+    log_step "检查 GitHub 仓库..."
     if command -v gh &>/dev/null; then
         gh repo create "${OPENCLAW_RESUME_USER}/${repo_name}" \
             --private \
             --description "openclaw-resume state for ${project_name}" \
-            2>/dev/null || log_warn "仓库可能已存在或 gh CLI 认证失败，请手动创建"
+            2>/dev/null || log_info "仓库可能已存在，继续..."
     else
-        log_warn "gh CLI 未安装，请手动在 GitHub 创建仓库: ${repo_name}（private）"
-        log_info "创建后按回车继续..."
-        read -r
+        log_info "gh CLI 未安装，跳过仓库创建（如需自动创建请安装 gh CLI）"
+        log_info "仓库名: ${repo_name}（如不存在请手动在 GitHub 创建）"
     fi
 
     # 4. 克隆仓库
@@ -47,16 +46,21 @@ resume-init() {
     mkdir -p "$OPENCLAW_RESUME_BASE"
     local clone_url="https://${OPENCLAW_RESUME_PAT}@github.com/${OPENCLAW_RESUME_USER}/${repo_name}.git"
 
-    if ! git clone "$clone_url" "$state_dir" 2>/dev/null; then
-        # 如果仓库为空，初始化本地再推送
+    # 先尝试 clone（限时 15 秒，避免空仓库卡住）
+    if timeout 15 git clone "$clone_url" "$state_dir" 2>/dev/null; then
+        log_info "仓库克隆成功"
+    else
+        # 仓库为空或 clone 失败，用 init + remote 方式
+        log_info "仓库为空，本地初始化..."
+        rm -rf "$state_dir" 2>/dev/null
         mkdir -p "$state_dir"
-        git -C "$state_dir" init
+        git -C "$state_dir" init -b main
         git -C "$state_dir" remote add origin "$clone_url"
     fi
 
     # 5. 创建目录结构
     log_step "创建目录结构..."
-    mkdir -p environment workspace checkpoints
+    mkdir -p "$state_dir/environment" "$state_dir/workspace" "$state_dir/checkpoints"
 
     # 6. 生成 progress.yaml
     log_step "生成进度文件..."
@@ -67,20 +71,20 @@ resume-init() {
     local expires
     expires=$(calc_expires_at)
 
-    cp "$(dirname "$0")/../templates/progress.yaml" progress.yaml
+    cp "$(dirname "$0")/../templates/progress.yaml" "$state_dir/progress.yaml"
 
     # 填充初始值
-    yaml_set progress.yaml "session.id" "$session_id"
-    yaml_set progress.yaml "session.started" "$now"
-    yaml_set progress.yaml "session.expires_at" "$expires"
-    yaml_set progress.yaml "session.last_saved" "$now"
-    yaml_set progress.yaml "position.project" "$project_name"
+    yaml_set "$state_dir/progress.yaml" "session.id" "$session_id"
+    yaml_set "$state_dir/progress.yaml" "session.started" "$now"
+    yaml_set "$state_dir/progress.yaml" "session.expires_at" "$expires"
+    yaml_set "$state_dir/progress.yaml" "session.last_saved" "$now"
+    yaml_set "$state_dir/progress.yaml" "position.project" "$project_name"
 
     # 追加初始 log 条目
     add_log_entry "$state_dir" "项目初始化完成"
 
     # 7. 生成 .gitignore
-    cat > .gitignore << 'EOF'
+    cat > "$state_dir/.gitignore" << 'EOF'
 # openclaw-resume 排除文件
 .env
 *.key
@@ -122,7 +126,7 @@ EOF
 
     # 10. 询问剩余时间
     log_step "设置环境剩余时间..."
-    bash "$(dirname "$0")/resume-ask-time.sh" "$project_name" ""
+    bash "$(dirname "$0")/resume-ask-time.sh" "$project_name" "60"
 
     log_info "下一步:"
     log_info "  1. 正常工作..."

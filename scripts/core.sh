@@ -11,6 +11,9 @@ OPENCLAW_RESUME_VERSION="0.1.0"
 OPENCLAW_RESUME_BASE="${OPENCLAW_RESUME_BASE:-$HOME/.openclaw-resume}"
 OPENCLAW_RESUME_WORKSPACE="${OPENCLAW_RESUME_WORKSPACE:-$HOME/workspace}"
 
+# 禁止 git 交互式提示（避免卡住）
+export GIT_TERMINAL_PROMPT=0
+
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -142,8 +145,20 @@ add_log_entry() {
 
     local entry="  - \"${time_str} ${entry_text}\""
 
-    # 追加到 log 列表末尾（在文件末尾追加）
-    echo "$entry" >> "$progress_file"
+    # 找到 log: 行，在其后插入条目
+    if grep -q "^log: \[\]" "$progress_file" 2>/dev/null; then
+        # log: [] → 替换为 log: + 条目
+        sed -i "s|^log: \[\]|log:\n${entry}|" "$progress_file"
+    elif grep -q "^log:" "$progress_file" 2>/dev/null; then
+        # log: 已有内容，在 log: 行后插入条目
+        sed -i "/^log:/a\\${entry}" "$progress_file"
+    else
+        # 没有 log 段落，追加到末尾
+        {
+            echo "log:"
+            echo "$entry"
+        } >> "$progress_file"
+    fi
 }
 
 # 检查是否有待处理的 log（.pending_log 文件）

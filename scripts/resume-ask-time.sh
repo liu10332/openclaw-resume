@@ -50,7 +50,7 @@ resume-ask-time() {
     expires=$(date -d "+${remaining} minutes" -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S%z")
 
     # 更新 progress.yaml
-    yaml_set progress_file "session.expires_at" "$expires"
+    yaml_set "$progress_file" "session.expires_at" "$expires"
 
     log_info "✅ 已设置 ${remaining} 分钟后到期"
     log_info "   过期时间: ${expires}"
