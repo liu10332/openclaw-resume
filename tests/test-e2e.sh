@@ -333,7 +333,7 @@ test_bootstrap() {
     content=$(cat "$state_dir/bootstrap.sh")
     assert_contains "bootstrap 包含项目名" "$content" "bootstrap-test"
     assert_contains "bootstrap 包含 resume-restore" "$content" "resume-restore"
-    assert_contains "bootstrap 包含 PAT 提示" "$content" "OPENCLAW_RESUME_PAT"
+    assert_contains "bootstrap 包含技能目录" "$content" ".openclaw/skills/openclaw-resume"
 
     # 验证可执行权限
     local is_exec

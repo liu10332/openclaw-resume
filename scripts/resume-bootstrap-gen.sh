@@ -29,7 +29,6 @@ set -e
 
 PROJECT_NAME="${1:-__PROJECT_NAME__}"
 RESUME_REPO="liu10332/openclaw-resume"
-RESUME_HOME="${OPENCLAW_RESUME_HOME:-$HOME/.openclaw-resume}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -65,24 +64,25 @@ echo "║   openclaw-resume 一键恢复               ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
-# 1. 下载 openclaw-resume 技能
-log_step "下载 openclaw-resume 技能..."
-RESUME_DIR="${RESUME_HOME}/skill"
+# 1. 安装 openclaw-resume 技能到 OpenClaw 技能目录
+log_step "安装 openclaw-resume 技能..."
+SKILL_DIR="$HOME/.openclaw/skills/openclaw-resume"
 
-if [ -d "${RESUME_DIR}/.git" ]; then
+if [ -d "${SKILL_DIR}/.git" ]; then
     log_info "技能已存在，更新中..."
-    cd "${RESUME_DIR}" && git pull --quiet 2>/dev/null || true
+    cd "${SKILL_DIR}" && git pull --quiet 2>/dev/null || true
 else
-    rm -rf "${RESUME_DIR}" 2>/dev/null
-    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null || \
-    git clone --quiet "https://github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null
-    log_info "技能下载完成"
+    mkdir -p "$(dirname "${SKILL_DIR}")"
+    rm -rf "${SKILL_DIR}" 2>/dev/null
+    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null || \
+    git clone --quiet "https://github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null
+    log_info "技能安装完成: ${SKILL_DIR}"
 fi
 
 # 2. 加载技能
 log_step "加载技能..."
-source "${RESUME_DIR}/scripts/core.sh"
-source "${RESUME_DIR}/scripts/resume-restore.sh"
+source "${SKILL_DIR}/scripts/core.sh"
+source "${SKILL_DIR}/scripts/resume-restore.sh"
 
 # 3. 恢复项目
 log_step "恢复项目: ${PROJECT_NAME}..."
@@ -93,15 +93,15 @@ echo ""
 echo "═══════════════════════════════════════════"
 log_info "恢复完成！继续上次的工作吧"
 echo ""
-echo "  常用命令:"
-echo "    source ${RESUME_DIR}/scripts/core.sh"
-echo "    source ${RESUME_DIR}/scripts/resume-save.sh"
+echo "  常用命令（已全局可用）:"
+echo "    source ${SKILL_DIR}/scripts/core.sh"
+echo "    source ${SKILL_DIR}/scripts/resume-save.sh"
 echo "    resume-save \"保存进度\""
 echo ""
-echo "    source ${RESUME_DIR}/scripts/resume-checkpoint.sh"
+echo "    source ${SKILL_DIR}/scripts/resume-checkpoint.sh"
 echo "    resume-checkpoint \"完成xxx\""
 echo ""
-echo "    source ${RESUME_DIR}/scripts/resume-status.sh"
+echo "    source ${SKILL_DIR}/scripts/resume-status.sh"
 echo "    resume-status"
 echo "═══════════════════════════════════════════"
 echo ""

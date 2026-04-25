@@ -226,24 +226,24 @@ EOF
 set -e
 PROJECT_NAME="${1:-__PROJECT_NAME__}"
 RESUME_REPO="liu10332/openclaw-resume"
-RESUME_HOME="${OPENCLAW_RESUME_HOME:-$HOME/.openclaw-resume}"
 if [ -z "${OPENCLAW_RESUME_PAT:-}" ] || [ -z "${OPENCLAW_RESUME_USER:-}" ]; then
     echo "请先设置环境变量:"
     echo "  export OPENCLAW_RESUME_PAT=\"ghp_你的token\""
     echo "  export OPENCLAW_RESUME_USER=\"你的github用户名\""
     exit 1
 fi
-echo "下载 openclaw-resume 技能..."
-RESUME_DIR="${RESUME_HOME}/skill"
-if [ -d "${RESUME_DIR}/.git" ]; then
-    cd "${RESUME_DIR}" && git pull --quiet 2>/dev/null || true
+echo "安装 openclaw-resume 技能..."
+SKILL_DIR="$HOME/.openclaw/skills/openclaw-resume"
+if [ -d "${SKILL_DIR}/.git" ]; then
+    cd "${SKILL_DIR}" && git pull --quiet 2>/dev/null || true
 else
-    rm -rf "${RESUME_DIR}" 2>/dev/null
-    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null || \
-    git clone --quiet "https://github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null
+    mkdir -p "$(dirname "${SKILL_DIR}")"
+    rm -rf "${SKILL_DIR}" 2>/dev/null
+    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null || \
+    git clone --quiet "https://github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null
 fi
-source "${RESUME_DIR}/scripts/core.sh"
-source "${RESUME_DIR}/scripts/resume-restore.sh"
+source "${SKILL_DIR}/scripts/core.sh"
+source "${SKILL_DIR}/scripts/resume-restore.sh"
 echo "恢复项目: ${PROJECT_NAME}..."
 resume-restore "${PROJECT_NAME}"
 echo ""
