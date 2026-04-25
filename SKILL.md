@@ -6,7 +6,7 @@ author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [workflow, persistence, session-management, github, cli]
+    tags: [workflow, persistence, session-management, github]
     related_skills: [hybrid-workflow]
 ---
 
@@ -25,18 +25,6 @@ OpenClaw 限时试用环境（1小时）的跨会话续接工具。
 - **自动同步** — 每15分钟自动 push + 随时手动保存
 - **环境恢复** — pip/npm/apt 依赖自动捕获和恢复
 - **检查点续接** — 只取已确认的检查点，避免中间状态污染
-- **统一 CLI** — `resume` 命令全局可用，无需 source
-
-## 安装
-
-```bash
-# 一键安装
-curl -sL https://raw.githubusercontent.com/liu10332/openclaw-resume/main/install.sh | bash
-
-# 或 clone 后本地安装
-git clone https://github.com/liu10332/openclaw-resume.git
-cd openclaw-resume && bash install.sh
-```
 
 ## 前置条件
 
@@ -47,12 +35,24 @@ cd openclaw-resume && bash install.sh
    ```
 2. Git 已安装并可访问 GitHub
 
+## 快速开始
+
+```bash
+# 克隆本项目
+git clone https://你的token@github.com/liu10332/openclaw-resume.git
+cd openclaw-resume
+
+# 加载核心
+source scripts/core.sh
+```
+
 ## 命令
 
 ### 初始化新项目
 
 ```bash
-resume init <project-name> [work-dir]
+source scripts/resume-init.sh
+resume-init <project-name>
 ```
 
 功能：
@@ -66,7 +66,8 @@ resume init <project-name> [work-dir]
 ### 恢复上次会话
 
 ```bash
-resume restore [project-name]
+source scripts/resume-restore.sh
+resume-restore [project-name]
 ```
 
 功能：
@@ -80,7 +81,8 @@ resume restore [project-name]
 ### 保存当前状态
 
 ```bash
-resume save [message]
+source scripts/resume-save.sh
+resume-save [message]
 ```
 
 功能：
@@ -92,7 +94,8 @@ resume save [message]
 ### 创建检查点
 
 ```bash
-resume checkpoint <description>
+source scripts/resume-checkpoint.sh
+resume-checkpoint <description>
 ```
 
 功能：
@@ -104,7 +107,8 @@ resume checkpoint <description>
 ### 列出所有项目
 
 ```bash
-resume list [-a]
+source scripts/resume-list.sh
+resume-list [-a]
 ```
 
 功能：
@@ -115,7 +119,8 @@ resume list [-a]
 ### 删除项目
 
 ```bash
-resume delete <project-name> [--force]
+source scripts/resume-delete.sh
+resume-delete <project-name> [--force]
 ```
 
 功能：
@@ -128,13 +133,15 @@ resume delete <project-name> [--force]
 ### 查看状态
 
 ```bash
-resume status [project-name]
+source scripts/resume-status.sh
+resume-status [project-name]
 ```
 
 ### 捕获环境
 
 ```bash
-resume env [project-name]
+source scripts/env-capture.sh
+resume-env [project-name]
 ```
 
 功能：
@@ -147,57 +154,57 @@ resume env [project-name]
 ### 恢复环境
 
 ```bash
-resume env-restore [project-name]
+source scripts/env-restore.sh
+env-restore [project-name]
 ```
 
 功能：
 - 执行 setup.sh（apt + pip + npm 差异安装）
 - 恢复 package.json 到工作区
-- 独立运行，不依赖 restore
+- 独立运行，不依赖 resume-restore
 
 ### 定时器控制
 
 ```bash
-resume timer start [project-name]   # 启动自动同步（每15分钟）
-resume timer stop                   # 停止自动同步
-resume timer status                 # 查看定时器状态
+source scripts/resume-timer.sh
+resume-timer start [project-name]   # 启动自动同步（每15分钟）
+resume-timer stop                   # 停止自动同步
+resume-timer status                 # 查看定时器状态
 ```
 
 ### 时间管理
 
 ```bash
-resume time [project-name]          # 查看剩余分钟数
-resume ask-time [project-name]      # 交互式设置剩余时间
+source scripts/resume-time-remaining.sh
+resume-time-remaining [project-name]    # 查看剩余分钟数
+
+source scripts/resume-ask-time.sh
+resume-ask-time [project-name]          # 交互式设置剩余时间
 ```
 
 ### 其他
 
 ```bash
-resume diff [project-name]          # 显示上次保存后的变化
-resume save "消息"                   # 随时保存
-resume version                      # 查看版本
-resume help                         # 查看帮助
-resume uninstall                    # 卸载
+source scripts/resume-urgent-save.sh
+resume-urgent-save [project-name]   # 紧急保存（剩余<5分钟时）
 ```
 
 ## 目录结构
 
 ```
-~/.openclaw-resume/
-├── bin/                       # 安装文件
-│   ├── resume                 #   统一入口
-│   └── scripts/               #   核心脚本
-├── <project-name>/            # 项目状态目录
-│   ├── progress.yaml          #   进度追踪
-│   ├── .pending_log           #   待处理的 log 标记
-│   ├── environment/           #   环境依赖
-│   │   ├── requirements.txt
-│   │   ├── apt-packages.txt
-│   │   ├── env-vars.txt
-│   │   └── setup.sh
-│   ├── workspace/             #   工作文件快照
-│   ├── checkpoints/           #   检查点
-│   └── .git/                  #   Git 仓库
+~/.openclaw-resume/<project-name>/    # 本地状态目录
+├── progress.yaml                      # 进度追踪
+├── .pending_log                       # 待处理的 log 标记
+├── environment/                       # 环境依赖
+│   ├── requirements.txt
+│   ├── apt-packages.txt
+│   ├── env-vars.txt
+│   └── setup.sh
+├── workspace/                         # 工作文件快照
+│   └── ...
+├── checkpoints/                       # 检查点
+│   └── *.yaml
+└── .git/                              # Git 仓库
 ```
 
 ## 使用流程
@@ -205,20 +212,23 @@ resume uninstall                    # 卸载
 ### 首次使用（新项目）
 ```
 1. 设置 PAT: export OPENCLAW_RESUME_PAT="ghp_xxx"
-2. 初始化: resume init rag-tool-v3
-3. 输入剩余时间: 55  ← Agent 会询问
-4. 正常工作...
-5. 定时器自动每15分钟同步
-6. 关键步骤后: resume checkpoint "完成OCR集成"
-7. 结束前: resume save "会话结束"
+2. 克隆: git clone ... && cd openclaw-resume
+3. source scripts/core.sh && source scripts/resume-init.sh
+4. 初始化: resume-init rag-tool-v3
+5. 输入剩余时间: 55  ← Agent 会询问
+6. 正常工作...
+7. 定时器自动每15分钟同步
+8. 关键步骤后: resume-checkpoint "完成OCR集成"
+9. 结束前: resume-save "会话结束"
 ```
 
 ### 后续使用（恢复）
 ```
-1. 恢复: resume restore rag-tool-v3
-2. 输入剩余时间: 50  ← Agent 会询问
-3. 查看状态: resume status
-4. 继续上次的工作...
+1. source scripts/core.sh && source scripts/resume-restore.sh
+2. 恢复: resume-restore rag-tool-v3
+3. 输入剩余时间: 50  ← Agent 会询问
+4. 查看状态: resume-status
+5. 继续上次的工作...
 ```
 
 ### 时间不足时的处理
@@ -228,7 +238,7 @@ Agent 自检：
   剩余 < 2 分钟 → 强烈提醒用户
 
 用户可手动续期：
-  resume ask-time  ← 重新设置时间
+  resume-ask-time  ← 重新设置时间
 ```
 
 ## 安全注意事项

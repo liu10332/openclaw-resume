@@ -55,9 +55,7 @@
 #### 切片
 - **S01: 代码重构** — 消除 9 处 detect_active_project 重复、2 处 sync_workspace_to_state 重复；修复 yaml_get/yaml_set 双层 key 解析；修复 resume-restore.sh 变量引用 bug
 - **S02: CRUD 命令** — resume-list（列出项目+状态）、resume-delete（删除项目+可选 GitHub 仓库）
-- **S03: CLI 统一入口** — resume.sh 统一 dispatch 所有子命令
-- **S04: 一键安装** — install.sh（GitHub 下载 + 本地安装 + PATH 配置）
-- **S05: 文档更新** — README、SKILL.md、AGENT_GUIDE.md、PROGRESS.md 全面更新
+- **S03: 文档更新** — README、SKILL.md、AGENT_GUIDE.md、PROGRESS.md 全面更新
 
 ## 进度
 

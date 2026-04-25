@@ -10,69 +10,90 @@ export OPENCLAW_RESUME_PAT="ghp_xxxxxxxxxxxx"
 export OPENCLAW_RESUME_USER="your-github-username"
 ```
 
+## 加载技能
+
+```bash
+cd openclaw-resume
+source scripts/core.sh
+```
+
+之后按需加载具体脚本：
+```bash
+source scripts/resume-init.sh        # 初始化
+source scripts/resume-restore.sh     # 恢复
+source scripts/resume-save.sh        # 保存
+source scripts/resume-checkpoint.sh  # 检查点
+source scripts/resume-status.sh      # 状态
+source scripts/resume-list.sh        # 列出项目
+source scripts/resume-delete.sh      # 删除项目
+source scripts/env-capture.sh        # 环境捕获
+source scripts/env-restore.sh        # 环境恢复
+source scripts/resume-timer.sh       # 定时器
+source scripts/resume-time-remaining.sh  # 剩余时间
+source scripts/resume-ask-time.sh    # 设置时间
+source scripts/resume-urgent-save.sh # 紧急保存
+```
+
 ## 核心流程
 
 ### 场景 1：首次使用（新项目）
 
 ```bash
-# 初始化
-resume init <project-name>
+source scripts/core.sh
+source scripts/resume-init.sh
+resume-init <project-name>
 
 # 正常工作...
 # 关键步骤后
-resume checkpoint "完成OCR集成"
+resume-checkpoint "完成OCR集成"
 
 # 随时保存
-resume save "调试中"
+resume-save "调试中"
 
-# 启动定时器（init 时可能已自动启动）
-resume timer start <project-name>
+# 启动定时器
+source scripts/resume-timer.sh
+resume-timer start <project-name>
 ```
 
 **Agent 注意事项：**
-- `resume init` 会自动创建 GitHub 仓库、捕获环境、设置过期时间
-- 初始化后确认定时器已启动（`resume timer status`）
-- 每完成一个有意义的步骤后调用 `resume checkpoint`
+- `resume-init` 会自动创建 GitHub 仓库、捕获环境、设置过期时间
+- 初始化后确认定时器已启动（`resume-timer status`）
+- 每完成一个有意义的步骤后调用 `resume-checkpoint`
 
 ### 场景 2：恢复上次会话
 
 ```bash
-# 恢复
-resume restore <project-name>
+source scripts/core.sh
+source scripts/resume-restore.sh
+resume-restore <project-name>
 
 # 确认进度
-resume status
-
-# 继续工作...
+source scripts/resume-status.sh
+resume-status
 ```
 
 **Agent 注意事项：**
-- `resume restore` 会自动拉取、恢复文件、恢复环境、启动定时器
-- 恢复后先用 `resume status` 确认进度
+- `resume-restore` 会自动拉取、恢复文件、恢复环境、启动定时器
+- 恢复后先用 `resume-status` 确认进度
 - 如果有未确认的检查点，询问用户是否确认
 
 ### 场景 3：查看项目
 
 ```bash
-# 列出所有项目
-resume list
+source scripts/resume-list.sh
+resume-list          # 列出所有项目
+resume-list -a       # 详细信息
 
-# 详细信息
-resume list -a
-
-# 查看某个项目状态
-resume status <project-name>
-
-# 查看变化
-resume diff <project-name>
+source scripts/resume-status.sh
+resume-status <project-name>
 ```
 
 ### 场景 4：工作中保存
 
 ```
 每 15 分钟：定时器自动保存（无需干预）
-关键节点：resume checkpoint <描述>
-随时保存：resume save <消息>
+关键节点：resume-checkpoint <描述>
+随时保存：resume-save <消息>
 ```
 
 **Agent 判断何时 checkpoint：**
@@ -90,8 +111,8 @@ resume diff <project-name>
 ### 场景 5：时间不足
 
 ```bash
-# 查看剩余时间
-resume time <project-name>
+source scripts/resume-time-remaining.sh
+remaining=$(resume-time-remaining <project-name>)
 
 # 当剩余 ≤ 5 分钟时：
 # 1. 自动触发紧急保存
@@ -99,45 +120,44 @@ resume time <project-name>
 # 3. Agent 应提示用户时间即将到期
 
 # 用户可手动续期
-resume ask-time <project-name>
+source scripts/resume-ask-time.sh
+resume-ask-time <project-name>
 ```
 
 ### 场景 6：会话结束
 
 ```bash
-resume save "会话结束，保存最终状态"
-resume timer stop
+resume-save "会话结束，保存最终状态"
+resume-timer stop
 ```
 
 ### 场景 7：删除项目
 
 ```bash
-# 交互式删除
-resume delete <project-name>
-
-# 强制删除（跳过确认）
-resume delete <project-name> --force
+source scripts/resume-delete.sh
+resume-delete <project-name>           # 交互式删除
+resume-delete <project-name> --force   # 强制删除
 ```
 
 ## 命令速查
 
 | 命令 | 何时用 | 参数 |
 |------|--------|------|
-| `resume init` | 首次使用 | `<project-name> [work-dir]` |
-| `resume restore` | 恢复会话 | `[project-name]` |
-| `resume save` | 随时保存 | `[message]` |
-| `resume checkpoint` | 关键节点 | `<description>` |
-| `resume status` | 查看进度 | `[project-name]` |
-| `resume list` | 列出项目 | `[-a]` |
-| `resume delete` | 删除项目 | `<name> [--force]` |
-| `resume diff` | 查看变化 | `[project-name]` |
-| `resume env` | 捕获环境 | `[project-name]` |
-| `resume env-restore` | 恢复环境 | `[project-name]` |
-| `resume time` | 剩余分钟 | `[project-name]` |
-| `resume ask-time` | 设置时间 | `[project-name]` |
-| `resume timer start` | 启动定时器 | `[project-name]` |
-| `resume timer stop` | 停止定时器 | — |
-| `resume timer status` | 定时器状态 | — |
+| `resume-init` | 首次使用 | `<project-name>` |
+| `resume-restore` | 恢复会话 | `[project-name]` |
+| `resume-save` | 随时保存 | `[message]` |
+| `resume-checkpoint` | 关键节点 | `<description>` |
+| `resume-status` | 查看进度 | `[project-name]` |
+| `resume-list` | 列出项目 | `[-a]` |
+| `resume-delete` | 删除项目 | `<name> [--force]` |
+| `resume-env` | 捕获环境 | `[project-name]` |
+| `env-restore` | 恢复环境 | `[project-name]` |
+| `resume-time-remaining` | 剩余分钟 | `[project-name]` |
+| `resume-ask-time` | 设置时间 | `[project-name]` |
+| `resume-timer start` | 启动定时器 | `[project-name]` |
+| `resume-timer stop` | 停止定时器 | — |
+| `resume-timer status` | 定时器状态 | — |
+| `resume-urgent-save` | 紧急保存 | `[project-name]` |
 
 ## 错误处理
 

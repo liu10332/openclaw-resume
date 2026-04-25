@@ -29,27 +29,20 @@
   - 自动检测并可选删除 GitHub 仓库
   - 停止关联的定时器
 
-#### S03: CLI 统一入口 ✅
-- `resume.sh`：统一 dispatch 所有子命令
-  - 支持所有原有命令（init/save/checkpoint/restore/status/...）
-  - 新增 `resume diff`（显示变化）
-  - 新增 `resume list` / `resume delete`
-  - `resume help` / `resume version` / `resume uninstall`
-  - 支持别名（`resume ls` = `resume list`，`resume rm` = `resume delete`）
+#### S03: CLI 统一入口 ❌ 已回退
+- ~~resume.sh：统一 dispatch 所有子命令~~
+- 回退原因：本项目是 OpenClaw Skill，用户是 AI Agent，不需要 CLI 安装层
 
-#### S04: 一键安装 ✅
-- `install.sh`：一键安装脚本
-  - 优先从本地源目录安装（git clone 后）
-  - 也可从 GitHub 直接下载
-  - 自动创建 `~/.local/bin/resume` 或添加 PATH
-  - 支持 `curl -sL .../install.sh | bash`
+#### S04: 一键安装 ❌ 已回退
+- ~~install.sh：一键安装脚本~~
+- 回退原因：同上，Agent 直接 source 脚本即可
 
-#### S05: 文档更新 ✅
-- README.md：重写，以 `resume` CLI 为核心
+#### S03b: 文档更新 ✅
+- README.md：以 source 方式为核心，保留 list/delete 命令说明
 - ROADMAP.md：新增 M007 里程碑
 - PROGRESS.md：新增 v0.2.0 进度
-- SKILL.md：更新版本号和命令
-- AGENT_GUIDE.md：更新命令列表
+- SKILL.md：更新版本号和命令列表
+- AGENT_GUIDE.md：更新命令速查表
 
 ### 测试
 - 从 33 项增加到 **54 项**，全部通过 ✅
