@@ -44,7 +44,9 @@ if [ -z "${OPENCLAW_RESUME_PAT:-}" ]; then
     echo ""
     echo "请先设置环境变量:"
     echo "  export OPENCLAW_RESUME_PAT=\"ghp_你的token\""
-    echo "  export OPENCLAW_RESUME_USER=\"你的github用户名\""
+    echo ""
+    echo "PAT 用于访问你的私有项目状态仓库。"
+    echo "技能仓库（openclaw-resume）已公开，下载不需要认证。"
     echo ""
     echo "然后重新运行: bash bootstrap.sh"
     exit 1
@@ -64,7 +66,7 @@ echo "║   openclaw-resume 一键恢复               ║"
 echo "╚═══════════════════════════════════════════╝"
 echo ""
 
-# 1. 安装 openclaw-resume 技能到 OpenClaw 技能目录
+# 1. 安装 openclaw-resume 技能（公开仓库，无需认证）
 log_step "安装 openclaw-resume 技能..."
 SKILL_DIR="$HOME/.openclaw/skills/openclaw-resume"
 
@@ -74,7 +76,6 @@ if [ -d "${SKILL_DIR}/.git" ]; then
 else
     mkdir -p "$(dirname "${SKILL_DIR}")"
     rm -rf "${SKILL_DIR}" 2>/dev/null
-    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null || \
     git clone --quiet "https://github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null
     log_info "技能安装完成: ${SKILL_DIR}"
 fi

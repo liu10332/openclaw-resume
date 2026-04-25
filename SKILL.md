@@ -34,9 +34,11 @@ OpenClaw 限时试用环境（1小时）的跨会话续接工具。
 3. bash 环境
 
 ```bash
-export OPENCLAW_RESUME_PAT="ghp_xxxxxxxxxxxx"
+export OPENCLAW_RESUME_PAT="ghp_xxxxxxxxxxxx"    # 用于访问私有项目状态仓库
 export OPENCLAW_RESUME_USER="your-github-username"
 ```
+
+> 本仓库已公开，下载技能不需要认证。PAT 仅用于访问你的私有项目状态仓库。
 
 ## 快速开始
 
@@ -51,7 +53,7 @@ bash quick-init.sh init my-project ./your-code
 bash quick-init.sh push my-project
 
 # 在另一台机器恢复
-git clone https://你的token@github.com/liu10332/openclaw-resume.git
+git clone https://github.com/liu10332/openclaw-resume.git
 cd openclaw-resume
 source scripts/core.sh
 source scripts/resume-restore.sh
@@ -61,7 +63,7 @@ resume-restore my-project
 ### 完整方式（检查点 + 定时器）
 
 ```bash
-git clone https://你的token@github.com/liu10332/openclaw-resume.git
+git clone https://github.com/liu10332/openclaw-resume.git
 cd openclaw-resume
 
 source scripts/core.sh

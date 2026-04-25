@@ -239,7 +239,6 @@ if [ -d "${SKILL_DIR}/.git" ]; then
 else
     mkdir -p "$(dirname "${SKILL_DIR}")"
     rm -rf "${SKILL_DIR}" 2>/dev/null
-    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null || \
     git clone --quiet "https://github.com/${RESUME_REPO}.git" "${SKILL_DIR}" 2>/dev/null
 fi
 source "${SKILL_DIR}/scripts/core.sh"
