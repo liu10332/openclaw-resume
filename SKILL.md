@@ -16,7 +16,7 @@ OpenClaw 限时试用环境（1小时）的跨会话续接工具。
 
 ## 问题
 
-在线 OpenClaw 试用每次限时1小时，环境销毁后所有数据丢失。需要一套工具让下次试用能接续上次任务。
+在线 OpenClaw 试用每次限时1小时，环境销毁后所有数据丢失。需要一套工具让下次试用能接续上次任务。本地开发时也希望能跨机器同步工作进度。
 
 ## 解决方案
 
@@ -25,28 +25,53 @@ OpenClaw 限时试用环境（1小时）的跨会话续接工具。
 - **自动同步** — 每15分钟自动 push + 随时手动保存
 - **环境恢复** — pip/npm/apt 依赖自动捕获和恢复
 - **检查点续接** — 只取已确认的检查点，避免中间状态污染
+- **一键恢复** — 新环境运行 bootstrap.sh 自动安装技能并恢复
 
 ## 前置条件
 
-1. GitHub 个人访问令牌 (PAT)，设置为环境变量：
-   ```bash
-   export OPENCLAW_RESUME_PAT="ghp_xxxxxxxxxxxx"
-   export OPENCLAW_RESUME_USER="your-github-username"
-   ```
-2. Git 已安装并可访问 GitHub
+1. GitHub 个人访问令牌 (PAT)：[创建地址](https://github.com/settings/tokens)，需要 `repo` 权限
+2. Git 已安装
+3. bash 环境
+
+```bash
+export OPENCLAW_RESUME_PAT="ghp_xxxxxxxxxxxx"
+export OPENCLAW_RESUME_USER="your-github-username"
+```
 
 ## 快速开始
 
+### 最简方式（quick-init.sh）
+
 ```bash
-# 克隆本项目
+curl -O https://raw.githubusercontent.com/liu10332/openclaw-resume/main/quick-init.sh
+chmod +x quick-init.sh
+
+# 保存项目到 GitHub
+bash quick-init.sh init my-project ./your-code
+bash quick-init.sh push my-project
+
+# 在另一台机器恢复
+git clone https://你的token@github.com/liu10332/openclaw-resume.git
+cd openclaw-resume
+source scripts/core.sh
+source scripts/resume-restore.sh
+resume-restore my-project
+```
+
+### 完整方式（检查点 + 定时器）
+
+```bash
 git clone https://你的token@github.com/liu10332/openclaw-resume.git
 cd openclaw-resume
 
-# 加载核心
 source scripts/core.sh
+source scripts/resume-init.sh
+resume-init my-project
 ```
 
 ## 命令
+
+所有命令都需要先 `source scripts/core.sh`，然后按需 source 对应脚本。
 
 ### 初始化新项目
 
@@ -55,13 +80,13 @@ source scripts/resume-init.sh
 resume-init <project-name>
 ```
 
-功能：
 - 创建 GitHub 仓库 `{project-name}-state`
-- 克隆到本地 `~/.openclaw-resume/{project-name}/`
-- 生成 progress.yaml 初始版本
-- 捕获当前环境依赖
-- 询问用户剩余时间，设置过期时间
-- 推送初始状态
+- 同步工作文件
+- 捕获 pip/apt/npm 环境依赖
+- 生成 setup.sh 环境恢复脚本
+- 询问剩余时间，设置过期时间
+- 启动 15 分钟自动同步定时器
+- 在状态仓库中生成 bootstrap.sh（供新环境一键恢复）
 
 ### 恢复上次会话
 
@@ -70,13 +95,11 @@ source scripts/resume-restore.sh
 resume-restore [project-name]
 ```
 
-功能：
 - 从 GitHub 拉取最新状态
-- 读取 progress.yaml 显示上次进度
-- 恢复工作文件到 workspace/
-- 执行环境恢复（setup.sh）
+- 显示上次进度（项目、任务、步骤、备注）
+- 恢复工作文件
+- 执行 setup.sh 恢复环境
 - 启动自动同步定时器
-- 询问用户剩余时间，设置过期时间
 
 ### 保存当前状态
 
@@ -85,11 +108,9 @@ source scripts/resume-save.sh
 resume-save [message]
 ```
 
-功能：
-- 更新 progress.yaml（log 条目）
-- 同步工作文件
-- git add + commit + push
-- 更新 last_saved 时间
+- 同步工作文件到状态目录
+- 更新 progress.yaml
+- git commit + push
 
 ### 创建检查点
 
@@ -98,11 +119,8 @@ source scripts/resume-checkpoint.sh
 resume-checkpoint <description>
 ```
 
-功能：
-- 创建 pending 检查点
-- 保存当前文件快照
+- 创建 pending 检查点（含文件快照、git commit hash）
 - 推送到 GitHub
-- 等待用户确认 → confirmed
 
 ### 列出所有项目
 
@@ -111,9 +129,7 @@ source scripts/resume-list.sh
 resume-list [-a]
 ```
 
-功能：
-- 列出所有项目及状态摘要
-- 显示最后保存时间、当前任务、检查点数、定时器状态
+- 显示项目名、最后保存时间、当前任务、检查点数、定时器状态
 - `-a` 显示详细信息
 
 ### 删除项目
@@ -123,12 +139,10 @@ source scripts/resume-delete.sh
 resume-delete <project-name> [--force]
 ```
 
-功能：
-- 显示项目摘要（任务、检查点、文件数）
-- 二次确认，`--force` 跳过
+- 显示项目摘要
+- 二次确认（`--force` 跳过）
 - 可选删除 GitHub 仓库
 - 停止关联的定时器
-- 删除本地数据
 
 ### 查看状态
 
@@ -137,39 +151,23 @@ source scripts/resume-status.sh
 resume-status [project-name]
 ```
 
-### 捕获环境
+### 捕获 / 恢复环境
 
 ```bash
 source scripts/env-capture.sh
 resume-env [project-name]
-```
 
-功能：
-- pip freeze → requirements.txt
-- npm ls -g → npm-global.json
-- dpkg --get-selections → apt-packages.txt
-- 捕获关键环境变量
-- 生成 setup.sh
-
-### 恢复环境
-
-```bash
 source scripts/env-restore.sh
 env-restore [project-name]
 ```
 
-功能：
-- 执行 setup.sh（apt + pip + npm 差异安装）
-- 恢复 package.json 到工作区
-- 独立运行，不依赖 resume-restore
-
-### 定时器控制
+### 定时器
 
 ```bash
 source scripts/resume-timer.sh
-resume-timer start [project-name]   # 启动自动同步（每15分钟）
-resume-timer stop                   # 停止自动同步
-resume-timer status                 # 查看定时器状态
+resume-timer start [project-name]   # 启动（每 15 分钟自动同步）
+resume-timer stop                   # 停止
+resume-timer status                 # 查看状态
 ```
 
 ### 时间管理
@@ -179,70 +177,81 @@ source scripts/resume-time-remaining.sh
 resume-time-remaining [project-name]    # 查看剩余分钟数
 
 source scripts/resume-ask-time.sh
-resume-ask-time [project-name]          # 交互式设置剩余时间
+resume-ask-time [project-name]          # 设置剩余时间
 ```
 
-### 其他
+### 紧急保存
 
 ```bash
 source scripts/resume-urgent-save.sh
-resume-urgent-save [project-name]   # 紧急保存（剩余<5分钟时）
+resume-urgent-save [project-name]
 ```
+
+剩余不足 5 分钟时触发，执行保存并推送。
+
+### 新环境一键恢复
+
+如果项目初始化时已生成 `bootstrap.sh`：
+
+```bash
+export OPENCLAW_RESUME_PAT="ghp_xxx"
+export OPENCLAW_RESUME_USER="your-user"
+bash bootstrap.sh
+```
+
+自动下载技能到 `~/.openclaw/skills/openclaw-resume/` 并恢复项目。
 
 ## 目录结构
 
 ```
-~/.openclaw-resume/<project-name>/    # 本地状态目录
-├── progress.yaml                      # 进度追踪
-├── .pending_log                       # 待处理的 log 标记
-├── environment/                       # 环境依赖
+~/.openclaw-resume/<project-name>/
+├── bootstrap.sh             # 新环境一键恢复脚本（自动生成）
+├── progress.yaml            # 进度追踪
+├── .pending_log             # 待处理的 log 标记
+├── environment/
 │   ├── requirements.txt
 │   ├── apt-packages.txt
 │   ├── env-vars.txt
 │   └── setup.sh
-├── workspace/                         # 工作文件快照
+├── workspace/
 │   └── ...
-├── checkpoints/                       # 检查点
+├── checkpoints/
 │   └── *.yaml
-└── .git/                              # Git 仓库
+└── .git/
 ```
 
 ## 使用流程
 
-### 首次使用（新项目）
+### 首次使用
 ```
-1. 设置 PAT: export OPENCLAW_RESUME_PAT="ghp_xxx"
-2. 克隆: git clone ... && cd openclaw-resume
-3. source scripts/core.sh && source scripts/resume-init.sh
-4. 初始化: resume-init rag-tool-v3
-5. 输入剩余时间: 55  ← Agent 会询问
-6. 正常工作...
-7. 定时器自动每15分钟同步
-8. 关键步骤后: resume-checkpoint "完成OCR集成"
-9. 结束前: resume-save "会话结束"
-```
-
-### 后续使用（恢复）
-```
-1. source scripts/core.sh && source scripts/resume-restore.sh
-2. 恢复: resume-restore rag-tool-v3
-3. 输入剩余时间: 50  ← Agent 会询问
-4. 查看状态: resume-status
-5. 继续上次的工作...
+1. export OPENCLAW_RESUME_PAT="ghp_xxx"
+2. export OPENCLAW_RESUME_USER="user"
+3. git clone ... && cd openclaw-resume
+4. source scripts/core.sh
+5. source scripts/resume-init.sh
+6. resume-init my-project          # 输入剩余时间
+7. 正常工作...
+8. resume-checkpoint "xxx"         # 关键节点
+9. resume-save "会话结束"           # 结束前
 ```
 
-### 时间不足时的处理
+### 恢复使用
 ```
-Agent 自检：
-  剩余 < 5 分钟 → 自动保存 + 提醒用户
-  剩余 < 2 分钟 → 强烈提醒用户
-
-用户可手动续期：
-  resume-ask-time  ← 重新设置时间
+1. source scripts/core.sh
+2. source scripts/resume-restore.sh
+3. resume-restore my-project       # 输入剩余时间
+4. 继续工作...
 ```
 
-## 安全注意事项
+### 新环境 bootstrap
+```
+1. export OPENCLAW_RESUME_PAT="ghp_xxx"
+2. export OPENCLAW_RESUME_USER="user"
+3. bash bootstrap.sh               # 自动安装技能 + 恢复
+```
 
-- PAT 仅存储在环境变量中，不写入磁盘
+## 安全
+
+- PAT 仅通过环境变量传递，不写入磁盘
 - 状态仓库默认 private
 - .gitignore 自动排除 .env、密钥文件等敏感信息
