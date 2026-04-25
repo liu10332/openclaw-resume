@@ -16,7 +16,7 @@ resume-timer() {
     case "$action" in
         start)
             if [ -z "$project_name" ]; then
-                project_name=$(detect_active_project_timer)
+                project_name=$(detect_active_project)
             fi
             start_timer "$project_name"
             ;;
@@ -83,22 +83,8 @@ start_timer() {
             now=$(date -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S%z")
             sed -i "s/last_saved:.*/last_saved: \"${now}\"/" "${state_dir}/progress.yaml" 2>/dev/null || true
 
-            # 同步工作文件
-            local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
-            local workspace_dst="${state_dir}/workspace"
-            mkdir -p "$workspace_dst"
-
-            if command -v rsync &>/dev/null; then
-                rsync -a --delete \
-                    --exclude='node_modules' \
-                    --exclude='__pycache__' \
-                    --exclude='.venv' \
-                    --exclude='.git' \
-                    --exclude='*.pyc' \
-                    "$workspace_src/" "$workspace_dst/" 2>/dev/null || true
-            else
-                cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
-            fi
+            # 同步工作文件（使用 core.sh 的统一函数）
+            sync_workspace_to_state "$state_dir"
 
             # Git 操作，使用 git -C 避免路径依赖
             git -C "$state_dir" add -A
@@ -149,7 +135,7 @@ stop_timer() {
             # 最后一次同步
             log_info "执行最后一次同步..."
             local project_name
-            project_name=$(detect_active_project_timer)
+            project_name=$(detect_active_project)
             if [ -n "$project_name" ]; then
                 bash "$(dirname "${BASH_SOURCE[0]}")/resume-save.sh" "timer_stopped: final sync" "$project_name"
             fi
@@ -182,27 +168,6 @@ timer_status() {
     else
         log_info "定时器未运行"
     fi
-}
-
-# 检测活动项目
-detect_active_project_timer() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
 }
 
 # 如果直接执行

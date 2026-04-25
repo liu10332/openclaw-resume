@@ -10,7 +10,7 @@ env-restore() {
     local project_name="${1:-}"
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_env_restore)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -72,28 +72,7 @@ env-restore() {
     fi
 }
 
-# 检测活动项目
-detect_active_project_env_restore() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 如果直接执行
+# 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     env-restore "$@"
 fi

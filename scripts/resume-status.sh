@@ -9,7 +9,7 @@ resume-status() {
     local project_name="${1:-}"
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_status)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -28,23 +28,23 @@ resume-status() {
     fi
 
     # 读取所有关键字段
-    local session_id project module task step total desc working
-    local started expires saved task_status
+    local session_id project task step total note
+    local started expires saved
 
-    session_id=$(yaml_get progress_file "session.id" "")
-    started=$(yaml_get progress_file "session.started" "")
-    expires=$(yaml_get progress_file "session.expires_at" "")
-    saved=$(yaml_get progress_file "session.last_saved" "")
+    session_id=$(yaml_get "$progress_file" "session.id" "")
+    started=$(yaml_get "$progress_file" "session.started" "")
+    expires=$(yaml_get "$progress_file" "session.expires_at" "")
+    saved=$(yaml_get "$progress_file" "session.last_saved" "")
 
-    project=$(yaml_get progress_file "position.project" "")
-    task=$(yaml_get progress_file "position.task" "")
-    step=$(yaml_get progress_file "position.step" "0")
-    total=$(yaml_get progress_file "position.total_steps" "0")
-    note=$(yaml_get progress_file "position.note" "")
+    project=$(yaml_get "$progress_file" "position.project" "")
+    task=$(yaml_get "$progress_file" "position.task" "")
+    step=$(yaml_get "$progress_file" "position.step" "0")
+    total=$(yaml_get "$progress_file" "position.total_steps" "0")
+    note=$(yaml_get "$progress_file" "position.note" "")
 
     # 计算剩余时间
     local remaining=""
-    if [ "$expires" != "" ] && [ "$expires" != "unknown" ]; then
+    if [ -n "$expires" ] && [ "$expires" != "unknown" ]; then
         local expire_epoch now_epoch
         expire_epoch=$(date -d "$expires" +%s 2>/dev/null || echo 0)
         now_epoch=$(date +%s)
@@ -108,28 +108,7 @@ resume-status() {
     echo ""
 }
 
-# 检测活动项目
-detect_active_project_status() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 如果直接执行
+# 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     resume-status "$@"
 fi

@@ -12,7 +12,7 @@ resume-urgent-save() {
     local project_name="${1:-}"
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_urgent)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -40,22 +40,8 @@ resume-urgent-save() {
 
     log_warn "⚠️  剩余不足 ${URGENT_THRESHOLD_MIN} 分钟！执行紧急保存..."
 
-    # 同步工作文件
-    local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
-    local workspace_dst="${state_dir}/workspace"
-    mkdir -p "$workspace_dst"
-
-    if command -v rsync &>/dev/null; then
-        rsync -a --delete \
-            --exclude='node_modules' \
-            --exclude='__pycache__' \
-            --exclude='.venv' \
-            --exclude='.git' \
-            --exclude='*.pyc' \
-            "$workspace_src/" "$workspace_dst/" 2>/dev/null || true
-    else
-        cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
-    fi
+    # 同步工作文件（使用 core.sh 统一函数）
+    sync_workspace_to_state "$state_dir"
 
     # 更新进度
     local now
@@ -80,28 +66,7 @@ resume-urgent-save() {
     fi
 }
 
-# 检测活动项目
-detect_active_project_urgent() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 如果直接执行
+# 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     resume-urgent-save "$@"
 fi

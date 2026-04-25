@@ -159,8 +159,64 @@ EOF
         assert_eq "retry 重试成功" "3" "$retry_count"
     fi
 
-    rm -f "$test_yaml"
-    rm -rf /tmp/test-e2e-state
+    # 测试 detect_active_project（无项目时返回空）
+    local detected
+    detected=$(detect_active_project)
+    assert_eq "detect_active_project 无项目时返回空" "" "$detected"
+
+    # 测试 list_all_projects（无项目时返回空）
+    local listed
+    listed=$(list_all_projects)
+    assert_eq "list_all_projects 无项目时返回空" "" "$listed"
+
+    # 测试 count_projects（无项目时返回 0）
+    local cnt
+    cnt=$(count_projects)
+    assert_eq "count_projects 无项目时返回 0" "0" "$cnt"
+
+    # 测试 sync_workspace_to_state
+    local sync_src="/tmp/test-e2e-sync-src"
+    local sync_dst="/tmp/test-e2e-sync-dst"
+    rm -rf "$sync_src" "$sync_dst"
+    mkdir -p "$sync_src"
+    echo "file1" > "$sync_src/a.txt"
+    mkdir "$sync_src/sub"
+    echo "file2" > "$sync_src/sub/b.txt"
+    echo "node_modules" > "$sync_src/node_modules"
+    export OPENCLAW_RESUME_WORKSPACE="$sync_src"
+    mkdir -p "$sync_dst"
+    sync_workspace_to_state "$sync_dst"
+    assert_file_exists "sync 复制文件 a.txt" "$sync_dst/workspace/a.txt"
+    assert_file_exists "sync 复制子目录文件 b.txt" "$sync_dst/workspace/sub/b.txt"
+    # node_modules 应被排除
+    local nm_count
+    nm_count=$(find "$sync_dst/workspace" -name "node_modules" 2>/dev/null | wc -l)
+    assert_eq "sync 排除 node_modules" "0" "$nm_count"
+
+    # 测试 yaml_get/yaml_set 双层 key
+    local test_yaml2="/tmp/test-e2e-yaml2.yaml"
+    cat > "$test_yaml2" << 'EOF'
+session:
+  id: "old-id"
+  name: "test"
+position:
+  project: "old-project"
+  task: "old-task"
+EOF
+    yaml_set "$test_yaml2" "session.id" "new-id"
+    yaml_set "$test_yaml2" "position.task" "new-task"
+    local got_id got_task
+    got_id=$(yaml_get "$test_yaml2" "session.id" "")
+    got_task=$(yaml_get "$test_yaml2" "position.task" "")
+    assert_eq "yaml_set+get session.id" "new-id" "$got_id"
+    assert_eq "yaml_set+get position.task" "new-task" "$got_task"
+    # 确保 session.name 没被误改
+    local got_name
+    got_name=$(yaml_get "$test_yaml2" "session.name" "")
+    assert_eq "yaml_set 不影响其他字段" "test" "$got_name"
+
+    rm -f "$test_yaml" "$test_yaml2"
+    rm -rf /tmp/test-e2e-state "$sync_src" "$sync_dst"
     echo ""
 }
 

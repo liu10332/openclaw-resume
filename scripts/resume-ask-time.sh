@@ -2,16 +2,17 @@
 # ========================================
 # resume-ask-time: 询问并记录剩余时间
 # 用法: source resume-ask-time.sh
-#        resume-ask-time <project-name>
+#        resume-ask-time <project-name> [remaining-minutes]
 # ========================================
 
 source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 
 resume-ask-time() {
     local project_name="${1:-}"
+    local remaining="${2:-}"
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_ask)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -23,14 +24,11 @@ resume-ask-time() {
     state_dir=$(get_state_dir "$project_name")
     local progress_file="${state_dir}/progress.yaml"
 
-    echo ""
-    echo "⏱️  当前环境还剩多少分钟？（输入整数，如 55）"
-    echo "   输入 0 表示不确定，使用默认60分钟"
-
-    # 读取用户输入（从 stdin 或参数）
-    local remaining="${2:-}"
-
+    # 如果没有传入剩余分钟数，交互式询问
     if [ -z "$remaining" ]; then
+        echo ""
+        echo "⏱️  当前环境还剩多少分钟？（输入整数，如 55）"
+        echo "   输入 0 表示不确定，使用默认60分钟"
         echo -n "剩余分钟数: "
         read -r remaining
     fi
@@ -60,28 +58,7 @@ resume-ask-time() {
     echo "$remaining"
 }
 
-# 检测活动项目
-detect_active_project_ask() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 如果直接执行
+# 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     resume-ask-time "$@"
 fi

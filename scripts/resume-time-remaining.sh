@@ -10,7 +10,7 @@ resume-time-remaining() {
     local project_name="${1:-}"
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_time)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -29,7 +29,7 @@ resume-time-remaining() {
 
     # 读取 expires_at
     local expires
-    expires=$(yaml_get progress_file "session.expires_at" "")
+    expires=$(yaml_get "$progress_file" "session.expires_at" "")
 
     if [ -z "$expires" ] || [ "$expires" = "unknown" ]; then
         echo "0"
@@ -53,28 +53,7 @@ resume-time-remaining() {
     return 0
 }
 
-# 检测活动项目
-detect_active_project_time() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 如果直接执行
+# 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     resume-time-remaining "$@"
 fi

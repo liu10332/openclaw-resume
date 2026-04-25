@@ -63,10 +63,10 @@ resume-restore() {
     fi
 
     local last_project last_task last_step last_note
-    last_project=$(yaml_get progress_file "position.project" "")
-    last_task=$(yaml_get progress_file "position.task" "")
-    last_step=$(yaml_get progress_file "position.step" "0")
-    last_note=$(yaml_get progress_file "position.note" "")
+    last_project=$(yaml_get "$progress_file" "position.project" "")
+    last_task=$(yaml_get "$progress_file" "position.task" "")
+    last_step=$(yaml_get "$progress_file" "position.step" "0")
+    last_note=$(yaml_get "$progress_file" "position.note" "")
 
     echo ""
     echo "═══════════════════════════════════════════"

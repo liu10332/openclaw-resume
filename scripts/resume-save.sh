@@ -58,52 +58,6 @@ resume-save() {
     fi
 }
 
-# 同步工作目录到状态目录
-sync_workspace_to_state() {
-    local state_dir="$1"
-    local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
-    local workspace_dst="${state_dir}/workspace"
-
-    mkdir -p "$workspace_dst"
-
-    # 使用 rsync 如果可用，否则用 cp
-    if command -v rsync &>/dev/null; then
-        rsync -a --delete \
-            --exclude='node_modules' \
-            --exclude='__pycache__' \
-            --exclude='.venv' \
-            --exclude='.git' \
-            --exclude='*.pyc' \
-            "$workspace_src/" "$workspace_dst/" 2>/dev/null || true
-    else
-        # 简单复制（不删除已有文件）
-        cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
-    fi
-}
-
-# 检测当前活动项目
-detect_active_project() {
-    # 从最近修改的 progress.yaml 中检测
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-
-    echo "$latest"
-}
-
 # 如果直接执行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     resume-save "$@"

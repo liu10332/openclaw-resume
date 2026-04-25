@@ -15,7 +15,7 @@ resume-checkpoint() {
     fi
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_cp)
+        project_name=$(detect_active_project)
     fi
 
     if [ -z "$project_name" ]; then
@@ -59,12 +59,10 @@ git_commit: "$(git -C "$state_dir" rev-parse --short HEAD 2>/dev/null || echo 'n
 EOF
 
     # 3. 追加到 progress.yaml 的 checkpoints 列表
-    local now
-    now=$(now_iso)
     add_log_entry "$state_dir" "创建检查点 #${checkpoint_id}: ${description}"
 
-    # 4. 同步工作文件
-    sync_workspace_to_state_cp "$state_dir"
+    # 4. 同步工作文件（使用 core.sh 统一函数）
+    sync_workspace_to_state "$state_dir"
 
     # 5. 提交推送
     git -C "$state_dir" add -A
@@ -87,7 +85,7 @@ resume-checkpoint-confirm() {
     fi
 
     if [ -z "$project_name" ]; then
-        project_name=$(detect_active_project_cp)
+        project_name=$(detect_active_project)
     fi
 
     local state_dir
@@ -121,48 +119,6 @@ get_next_checkpoint_id() {
     local count
     count=$(find "$checkpoints_dir" -name "*.yaml" 2>/dev/null | wc -l)
     echo $((count + 1))
-}
-
-# 检测活动项目（复用逻辑）
-detect_active_project_cp() {
-    local latest=""
-    local latest_time=0
-
-    if [ -d "$OPENCLAW_RESUME_BASE" ]; then
-        for dir in "$OPENCLAW_RESUME_BASE"/*/; do
-            local progress_file="${dir}progress.yaml"
-            if [ -f "$progress_file" ]; then
-                local mtime
-                mtime=$(stat -c %Y "$progress_file" 2>/dev/null || stat -f %m "$progress_file" 2>/dev/null || echo 0)
-                if [ "$mtime" -gt "$latest_time" ]; then
-                    latest_time=$mtime
-                    latest=$(basename "$dir")
-                fi
-            fi
-        done
-    fi
-    echo "$latest"
-}
-
-# 同步工作目录
-sync_workspace_to_state_cp() {
-    local state_dir="$1"
-    local workspace_src="${OPENCLAW_RESUME_WORKSPACE}"
-    local workspace_dst="${state_dir}/workspace"
-
-    mkdir -p "$workspace_dst"
-
-    if command -v rsync &>/dev/null; then
-        rsync -a --delete \
-            --exclude='node_modules' \
-            --exclude='__pycache__' \
-            --exclude='.venv' \
-            --exclude='.git' \
-            --exclude='*.pyc' \
-            "$workspace_src/" "$workspace_dst/" 2>/dev/null || true
-    else
-        cp -r "$workspace_src"/* "$workspace_dst/" 2>/dev/null || true
-    fi
 }
 
 # 如果直接执行此脚本
