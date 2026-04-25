@@ -5,6 +5,7 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/core.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/env-capture.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/resume-bootstrap-gen.sh"
 
 resume-init() {
     local project_name="${1:-}"
@@ -105,7 +106,11 @@ EOF
     # 传入 state_dir 直接捕获，避免依赖项目检测
     capture_environment "$state_dir"
 
-    # 8. 提交并推送
+    # 8. 生成 bootstrap.sh（供新环境一键恢复）
+    log_step "生成恢复引导脚本..."
+    generate_bootstrap "$state_dir" "$project_name"
+
+    # 9. 提交并推送
     log_step "提交并推送..."
     git -C "$state_dir" add -A
     git -C "$state_dir" commit -m "init: ${project_name} state initialized"

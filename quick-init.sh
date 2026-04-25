@@ -213,6 +213,45 @@ CLONE_URL=${CLONE_URL}
 EOF
     chmod 600 "$STATE_DIR/.resume-config"
 
+    # 生成 bootstrap.sh（供新环境一键恢复）
+    cat > "$STATE_DIR/bootstrap.sh" << 'BOOTSTRAP_EOF'
+#!/bin/bash
+# openclaw-resume 一键恢复脚本
+# 在新的 OpenClaw 试用环境中运行此脚本即可恢复项目
+#
+# 用法:
+#   export OPENCLAW_RESUME_PAT="ghp_你的token"
+#   export OPENCLAW_RESUME_USER="你的github用户名"
+#   bash bootstrap.sh [project-name]
+set -e
+PROJECT_NAME="${1:-__PROJECT_NAME__}"
+RESUME_REPO="liu10332/openclaw-resume"
+RESUME_HOME="${OPENCLAW_RESUME_HOME:-$HOME/.openclaw-resume}"
+if [ -z "${OPENCLAW_RESUME_PAT:-}" ] || [ -z "${OPENCLAW_RESUME_USER:-}" ]; then
+    echo "请先设置环境变量:"
+    echo "  export OPENCLAW_RESUME_PAT=\"ghp_你的token\""
+    echo "  export OPENCLAW_RESUME_USER=\"你的github用户名\""
+    exit 1
+fi
+echo "下载 openclaw-resume 技能..."
+RESUME_DIR="${RESUME_HOME}/skill"
+if [ -d "${RESUME_DIR}/.git" ]; then
+    cd "${RESUME_DIR}" && git pull --quiet 2>/dev/null || true
+else
+    rm -rf "${RESUME_DIR}" 2>/dev/null
+    git clone --quiet "https://${OPENCLAW_RESUME_PAT}@github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null || \
+    git clone --quiet "https://github.com/${RESUME_REPO}.git" "${RESUME_DIR}" 2>/dev/null
+fi
+source "${RESUME_DIR}/scripts/core.sh"
+source "${RESUME_DIR}/scripts/resume-restore.sh"
+echo "恢复项目: ${PROJECT_NAME}..."
+resume-restore "${PROJECT_NAME}"
+echo ""
+echo "恢复完成！继续上次的工作吧"
+BOOTSTRAP_EOF
+    sed -i "s/__PROJECT_NAME__/${PROJECT_NAME}/g" "$STATE_DIR/bootstrap.sh"
+    chmod +x "$STATE_DIR/bootstrap.sh"
+
     # 初始提交（不推送）
     git -C "$STATE_DIR" add -A
     git -C "$STATE_DIR" commit -m "init: ${PROJECT_NAME} state initialized" 2>/dev/null || true

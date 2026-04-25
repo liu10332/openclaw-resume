@@ -309,6 +309,41 @@ test_delete() {
 }
 
 # ========================================
+# 测试 9: bootstrap 生成
+# ========================================
+test_bootstrap() {
+    echo -e "${YELLOW}=== 测试 9: bootstrap 生成 ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    source "$SCRIPT_DIR/resume-bootstrap-gen.sh" 2>/dev/null
+
+    # 创建模拟项目
+    local state_dir="$TEST_BASE/bootstrap-test"
+    mkdir -p "$state_dir/environment" "$state_dir/workspace" "$state_dir/checkpoints"
+    git -C "$state_dir" init -b main 2>/dev/null
+    cp "$SCRIPT_DIR/../templates/progress.yaml" "$state_dir/progress.yaml"
+
+    # 生成 bootstrap
+    generate_bootstrap "$state_dir" "bootstrap-test"
+
+    assert_file_exists "bootstrap.sh 已生成" "$state_dir/bootstrap.sh"
+
+    # 验证内容包含项目名
+    local content
+    content=$(cat "$state_dir/bootstrap.sh")
+    assert_contains "bootstrap 包含项目名" "$content" "bootstrap-test"
+    assert_contains "bootstrap 包含 resume-restore" "$content" "resume-restore"
+    assert_contains "bootstrap 包含 PAT 提示" "$content" "OPENCLAW_RESUME_PAT"
+
+    # 验证可执行权限
+    local is_exec
+    [ -x "$state_dir/bootstrap.sh" ] && is_exec="true" || is_exec="false"
+    assert_eq "bootstrap.sh 有可执行权限" "true" "$is_exec"
+
+    echo ""
+}
+
+# ========================================
 # 测试 2: resume-init（本地模式）
 # ========================================
 test_init() {
@@ -537,6 +572,7 @@ main() {
     test_time_remaining
     test_list
     test_delete
+    test_bootstrap
     cleanup
 
     echo "═══════════════════════════════════════════"
