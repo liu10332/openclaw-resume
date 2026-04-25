@@ -311,7 +311,7 @@ yaml_get() {
         if [ "$parent" = "$field" ]; then
             # 单层 key，直接匹配顶层
             local value
-            value=$(grep -E "^${field}:" "$file" 2>/dev/null | head -1 | sed 's/^[^:]*: *//; s/^"//; s/"$//; s/^'\''//; s/'\''$//' || true)
+            value=$(grep -E "^${field}:" "$file" 2>/dev/null | head -1 | sed 's/^[^:]*: *//; s/ *#.*//; s/^"//; s/"$//; s/^'\''//; s/'\''$//' || true)
         else
             # 双层 key：先定位父级块，再在块内匹配字段
             # 使用 awk 提取父级 section 下的字段
@@ -322,6 +322,8 @@ yaml_get() {
                 in_section && /^[^ ]/ { in_section=0 }
                 in_section && $0 ~ "^  "field":" {
                     sub(/^  [^:]*: */, "")
+                    # 去掉行内注释（# 开头）
+                    sub(/ *#[^"'\''"]*$/, "")
                     gsub(/^["'\''"]|["'\''"]$/, "")
                     print
                     exit

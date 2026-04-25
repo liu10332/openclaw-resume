@@ -221,6 +221,94 @@ EOF
 }
 
 # ========================================
+# 测试 7: resume-list
+# ========================================
+test_list() {
+    echo -e "${YELLOW}=== 测试 7: resume-list ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    source "$SCRIPT_DIR/resume-list.sh" 2>/dev/null
+
+    # 创建两个模拟项目
+    for name in project-alpha project-beta; do
+        local dir="$TEST_BASE/$name"
+        mkdir -p "$dir/environment" "$dir/workspace" "$dir/checkpoints"
+        git -C "$dir" init -b main 2>/dev/null
+        cp "$SCRIPT_DIR/../templates/progress.yaml" "$dir/progress.yaml"
+        yaml_set "$dir/progress.yaml" "position.project" "$name"
+        yaml_set "$dir/progress.yaml" "position.task" "task-${name}"
+        add_log_entry "$dir" "初始化 ${name}"
+        git -C "$dir" add -A 2>/dev/null
+        git -C "$dir" commit -m "init: $name" 2>/dev/null
+    done
+
+    # 测试 list_all_projects
+    local listed
+    listed=$(list_all_projects)
+    assert_contains "list_all_projects 包含 project-alpha" "$listed" "project-alpha"
+    assert_contains "list_all_projects 包含 project-beta" "$listed" "project-beta"
+
+    # 测试 count_projects（+1 是因为 test_init 创建的 e2e-test）
+    local cnt
+    cnt=$(count_projects)
+    assert_eq "count_projects 返回 3 (含 e2e-test)" "3" "$cnt"
+
+    # 测试 detect_active_project（两个项目时返回最近修改的）
+    # 修改 project-beta 的 progress.yaml 使其更新
+    sleep 1
+    touch "$TEST_BASE/project-beta/progress.yaml"
+    local detected
+    detected=$(detect_active_project)
+    assert_eq "detect_active_project 返回最近活跃的" "project-beta" "$detected"
+
+    # 测试 resume-list 输出包含项目名
+    local list_output
+    list_output=$(resume-list 2>&1)
+    assert_contains "resume-list 输出包含 project-alpha" "$list_output" "project-alpha"
+    assert_contains "resume-list 输出包含 project-beta" "$list_output" "project-beta"
+    assert_contains "resume-list 输出包含任务名" "$list_output" "task-project-beta"
+
+    echo ""
+}
+
+# ========================================
+# 测试 8: resume-delete
+# ========================================
+test_delete() {
+    echo -e "${YELLOW}=== 测试 8: resume-delete ===${NC}"
+
+    source "$SCRIPT_DIR/core.sh" 2>/dev/null
+    source "$SCRIPT_DIR/resume-delete.sh" 2>/dev/null
+
+    # 确认 project-alpha 存在
+    assert_dir_exists "project-alpha 删除前存在" "$TEST_BASE/project-alpha"
+
+    # 用 --force 删除（跳过确认，不删 GitHub）
+    export OPENCLAW_RESUME_PAT=""  # 模拟无 PAT，跳过 GitHub 检查
+    resume-delete "project-alpha" --force 2>&1
+
+    # 验证已删除
+    local alpha_exists=true
+    [ ! -d "$TEST_BASE/project-alpha" ] && alpha_exists=false
+    assert_eq "project-alpha 已删除" "false" "$alpha_exists"
+
+    # 验证 project-beta 还在
+    assert_dir_exists "project-beta 仍然存在" "$TEST_BASE/project-beta"
+
+    # 测试删除不存在的项目
+    local delete_output
+    delete_output=$(resume-delete "nonexistent" 2>&1 || true)
+    assert_contains "删除不存在的项目报错" "$delete_output" "不存在"
+
+    # 测试 count_projects 现在少了一个
+    local cnt
+    cnt=$(count_projects)
+    assert_eq "删除后 count_projects 返回 2" "2" "$cnt"
+
+    echo ""
+}
+
+# ========================================
 # 测试 2: resume-init（本地模式）
 # ========================================
 test_init() {
@@ -447,6 +535,8 @@ main() {
     test_checkpoint
     test_status
     test_time_remaining
+    test_list
+    test_delete
     cleanup
 
     echo "═══════════════════════════════════════════"
